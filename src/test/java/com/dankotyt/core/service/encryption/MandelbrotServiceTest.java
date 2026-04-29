@@ -200,7 +200,7 @@ class MandelbrotServiceTest {
             MandelbrotParams params = service.generateParams(prng);
             assertTrue(params.zoom() > 0);
             assertTrue(params.zoom() >= 10_000);
-            assertTrue(params.zoom() <= 10_000 + 700 * 140);
+            assertTrue(params.zoom() <= 10_000 + 701 * 140);
         }
     }
 

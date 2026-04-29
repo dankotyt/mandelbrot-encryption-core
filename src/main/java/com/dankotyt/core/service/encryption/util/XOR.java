@@ -4,8 +4,26 @@ import org.springframework.stereotype.Component;
 
 import java.awt.image.BufferedImage;
 
+/**
+ * Утилита для побитовой операции XOR над двумя изображениями.
+ *
+ * <p>Применяет XOR к RGB-компонентам каждого пикселя, сохраняя альфа-канал
+ * из первого изображения. Оба изображения должны иметь одинаковые размеры.</p>
+ *
+ * @author dankotyt
+ * @since 1.1.0
+ */
 @Component
 public class XOR {
+
+    /**
+     * Выполняет побитовый XOR RGB-компонентов двух изображений одинакового размера.
+     *
+     * @param image1 первое изображение (альфа-канал сохраняется)
+     * @param image2 второе изображение
+     * @return новое изображение с результатом XOR
+     * @throws IllegalArgumentException если любое из изображений null или размеры не совпадают
+     */
     public static BufferedImage performXOR(BufferedImage image1, BufferedImage image2) {
         if (image1 == null || image2 == null) {
             throw new IllegalArgumentException("Images cannot be null");
