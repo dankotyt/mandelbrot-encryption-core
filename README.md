@@ -40,7 +40,7 @@ The library has no dependencies on JavaFX or UI frameworks. It works both with S
 
 ```xml
 <dependency>
-    <groupId>com.dankotyt</groupId>
+    <groupId>io.github.dankotyt</groupId>
     <artifactId>mandelbrot-encryption-core</artifactId>
     <version>1.1.0</version>
 </dependency>
@@ -48,7 +48,7 @@ The library has no dependencies on JavaFX or UI frameworks. It works both with S
 
 ### Gradle
 ```groovy
-implementation 'com.dankotyt:mandelbrot-encryption-core:1.1.0'
+implementation 'io.github.dankotyt:mandelbrot-encryption-core:1.1.0'
 ```
 
 # 🔧 Требования | Requirements
