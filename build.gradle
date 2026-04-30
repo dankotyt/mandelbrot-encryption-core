@@ -17,8 +17,6 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
-    withSourcesJar()
-    withJavadocJar()
 }
 
 dependencyManagement {
@@ -56,8 +54,9 @@ test {
 }
 
 mavenPublishing {
-    publishToMavenCentral = true
-    automaticRelease = true
+    publishToMavenCentral()
+    signAllPublications()
+    coordinates("io.github.dankotyt", "mandelbrot-encryption-core", version)
 
     pom {
         name = 'Mandelbrot Crypto Core'
@@ -83,8 +82,5 @@ mavenPublishing {
 }
 
 signing {
-    def signingKey = project.findProperty("signing.key") ?: System.getenv("SIGNING_KEY")
-    def signingPassword = project.findProperty("signing.password") ?: System.getenv("SIGNING_PASSWORD")
-    useInMemoryPgpKeys(signingKey, signingPassword)
-    sign publishing.publications.mavenJava
+    useGpgCmd()
 }
