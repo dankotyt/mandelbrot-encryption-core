@@ -8,7 +8,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
@@ -23,6 +23,9 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+
+      - name: Make Gradlew executable
+        run: chmod +x ./gradlew
 
       - name: Publish to Maven Central
         run: ./gradlew publishToMavenCentral
