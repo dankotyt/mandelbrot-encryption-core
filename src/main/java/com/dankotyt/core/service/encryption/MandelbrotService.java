@@ -2,9 +2,6 @@ package com.dankotyt.core.service.encryption;
 
 import com.dankotyt.core.dto.MandelbrotParams;
 import com.dankotyt.core.service.encryption.impl.MandelbrotParamsGeneratorImpl;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -30,17 +27,62 @@ import java.util.concurrent.Future;
  * @since 1.1.0
  */
 @Component
-@RequiredArgsConstructor
 public class MandelbrotService {
     private static final Logger logger = LoggerFactory.getLogger(MandelbrotService.class);
 
-    @Getter @Setter
     private int targetWidth;
-    @Getter @Setter
     private int targetHeight;
 
     private final MandelbrotParamsGenerator paramsGenerator;
 
+    /**
+     * Возвращает целевую ширину изображения фрактала.
+     *
+     * @return ширина в пикселях.
+     */
+    public int getTargetWidth() {
+        return targetWidth;
+    }
+
+    /**
+     * Устанавливает целевую ширину изображения фрактала.
+     *
+     * @param targetWidth ширина в пикселях.
+     */
+    public void setTargetWidth(int targetWidth) {
+        this.targetWidth = targetWidth;
+    }
+
+    /**
+     * Возвращает целевую высоту изображения фрактала.
+     *
+     * @return высота в пикселях.
+     */
+    public int getTargetHeight() {
+        return targetHeight;
+    }
+
+    /**
+     * Устанавливает целевую высоту изображения фрактала.
+     *
+     * @param targetHeight высота в пикселях.
+     */
+    public void setTargetHeight(int targetHeight) {
+        this.targetHeight = targetHeight;
+    }
+
+    /**
+     * Создаёт сервис с переданным генератором параметров фрактала.
+     *
+     * @param paramsGenerator генератор случайных параметров множества Мандельброта.
+     */
+    public MandelbrotService(MandelbrotParamsGenerator paramsGenerator) {
+        this.paramsGenerator = paramsGenerator;
+    }
+
+    /**
+     * Создаёт сервис с генератором параметров по умолчанию.
+     */
     public MandelbrotService() {
         this(new MandelbrotParamsGeneratorImpl());
     }
@@ -78,7 +120,7 @@ public class MandelbrotService {
             throw new IllegalArgumentException("MAX_ITER must be positive: " + MAX_ITER);
         }
 
-        BufferedImage resultImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        BufferedImage resultImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
 
         try (ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())) {
             int processors = Runtime.getRuntime().availableProcessors();
@@ -170,7 +212,6 @@ public class MandelbrotService {
 
         for (int p : pixels) {
             int rgb = p & 0x00FFFFFF;
-            // Пропускаем внутренние точки (настраиваем под ваш код)
             if (rgb == 0x000040 || rgb == 0x000000) continue;
 
             int r = (rgb >> 16) & 0xFF;
@@ -187,10 +228,9 @@ public class MandelbrotService {
         }
 
         if (totalConsidered == 0) {
-            return false; // нет внешних точек с цветом
+            return false;
         }
 
-        // Подсчет занятых бинов
         int nonEmpty = 0;
         int maxCount = 0;
         for (int count : binCounts) {

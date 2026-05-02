@@ -1,14 +1,13 @@
 package com.dankotyt.core.service.encryption.impl;
 
-import com.dankotyt.core.dto.MandelbrotParams;
 import com.dankotyt.core.dto.EncryptedData;
+import com.dankotyt.core.dto.MandelbrotParams;
 import com.dankotyt.core.service.encryption.ImageEncryptor;
 import com.dankotyt.core.service.encryption.MandelbrotService;
 import com.dankotyt.core.service.encryption.SegmentShuffler;
 import com.dankotyt.core.service.encryption.util.HKDF;
 import com.dankotyt.core.service.encryption.util.XOR;
 import com.dankotyt.core.utils.ImageUtils;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -28,7 +27,6 @@ import java.security.SecureRandom;
  * @since 1.1.0
  */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class ImageEncryptorImpl implements ImageEncryptor {
 
@@ -41,6 +39,19 @@ public class ImageEncryptorImpl implements ImageEncryptor {
     private SecureRandom segmentationPrng;
     private int attemptCount;
     private BufferedImage fractal;
+
+    /**
+     * Создаёт экземпляр шифратора с заданными сервисами.
+     *
+     * @param mandelbrotService сервис генерации фракталов Мандельброта.
+     * @param segmentShuffler   сервис перемешивания сегментов изображения.
+     * @param imageUtils        утилиты для работы с изображениями.
+     */
+    public ImageEncryptorImpl(MandelbrotService mandelbrotService, SegmentShuffler segmentShuffler, ImageUtils imageUtils) {
+        this.mandelbrotService = mandelbrotService;
+        this.segmentShuffler = segmentShuffler;
+        this.imageUtils = imageUtils;
+    }
 
     /**
      * Подготавливает сессию шифрования на основе общего секрета, полученного по протоколу ECDH.
@@ -80,8 +91,6 @@ public class ImageEncryptorImpl implements ImageEncryptor {
 
         this.attemptCount = 0;
         this.fractal = null;
-
-        log.info("Сессия подготовлена, сгенерирована новая соль");
     }
 
     /**
@@ -92,7 +101,6 @@ public class ImageEncryptorImpl implements ImageEncryptor {
     public BufferedImage generateNextFractal(int width, int height) {
         attemptCount++;
         MandelbrotParams params = mandelbrotService.generateParams(paramsPrng);
-        log.debug("Генерация фрактала: попытка {}, params={}", attemptCount, params);
 
         fractal = mandelbrotService.generateImage(
                 width, height,
@@ -111,19 +119,20 @@ public class ImageEncryptorImpl implements ImageEncryptor {
      *   <li>Сохранение в бинарный файл с метаданными</li>
      * </ol>
      *
-     * @param originalImage оригинальное изображение для шифрования
+     * @param originalImage оригинальное изображение для шифрования (может быть RGB)
      */
     @Override
     public EncryptedData encryptWhole(BufferedImage originalImage) {
-        int width = originalImage.getWidth();
-        int height = originalImage.getHeight();
+        BufferedImage argbImage = ImageUtils.convertToARGB(originalImage);
+        int width = argbImage.getWidth();
+        int height = argbImage.getHeight();
 
         if (fractal == null || fractal.getWidth() != width || fractal.getHeight() != height) {
             log.warn("Фрактал отсутствует или не соответствует размеру, генерируем заново");
             generateNextFractal(width, height);
         }
 
-        BufferedImage xored = XOR.performXOR(originalImage, fractal);
+        BufferedImage xored = XOR.performXOR(argbImage, fractal, true);
         BufferedImage finalImage = segmentShuffler.segmentAndShuffle(xored, segmentationPrng).shuffledImage();
 
         return new EncryptedData(sessionSalt, attemptCount, 0, 0,
@@ -151,7 +160,7 @@ public class ImageEncryptorImpl implements ImageEncryptor {
      * Выполняет частичное шифрование заданной прямоугольной области изображения.
      * Координаты и размеры области передаются непосредственно как целые числа.
      *
-     * @param originalImage оригинальное изображение
+     * @param originalImage оригинальное изображение (может быть RGB)
      * @param sx            X-координата левого верхнего угла области
      * @param sy            Y-координата левого верхнего угла области
      * @param areaWidth     ширина области
@@ -160,21 +169,22 @@ public class ImageEncryptorImpl implements ImageEncryptor {
      */
     @Override
     public EncryptedData encryptPart(BufferedImage originalImage, int sx, int sy, int areaWidth, int areaHeight) {
-        int origWidth = originalImage.getWidth();
-        int origHeight = originalImage.getHeight();
+        BufferedImage argbImage = ImageUtils.convertToARGB(originalImage);
+        int origWidth = argbImage.getWidth();
+        int origHeight = argbImage.getHeight();
 
         if (fractal == null || fractal.getWidth() != areaWidth || fractal.getHeight() != areaHeight) {
             log.warn("Фрактал отсутствует или не соответствует размеру области, генерируем заново");
             generateNextFractal(areaWidth, areaHeight);
         }
 
-        BufferedImage areaImage = originalImage.getSubimage(sx, sy, areaWidth, areaHeight);
-        BufferedImage xoredArea = XOR.performXOR(areaImage, fractal);
+        BufferedImage areaImage = argbImage.getSubimage(sx, sy, areaWidth, areaHeight);
+        BufferedImage xoredArea = XOR.performXOR(areaImage, fractal, true);
         BufferedImage shuffledArea = segmentShuffler.segmentAndShuffle(xoredArea, segmentationPrng).shuffledImage();
 
-        BufferedImage finalImage = new BufferedImage(origWidth, origHeight, BufferedImage.TYPE_INT_RGB);
+        BufferedImage finalImage = new BufferedImage(origWidth, origHeight, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = finalImage.createGraphics();
-        g.drawImage(originalImage, 0, 0, null);
+        g.drawImage(argbImage, 0, 0, null);
         g.drawImage(shuffledArea, sx, sy, null);
         g.dispose();
 

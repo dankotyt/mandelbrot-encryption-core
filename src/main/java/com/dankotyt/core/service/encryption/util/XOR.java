@@ -19,41 +19,67 @@ public class XOR {
     /**
      * Выполняет побитовый XOR RGB-компонентов двух изображений одинакового размера.
      *
-     * @param image1 первое изображение (альфа-канал сохраняется)
-     * @param image2 второе изображение
+     * @param source исходное изображение
+     * @param fractal фрактальная гамма
      * @return новое изображение с результатом XOR
      * @throws IllegalArgumentException если любое из изображений null или размеры не совпадают
      */
-    public static BufferedImage performXOR(BufferedImage image1, BufferedImage image2) {
-        if (image1 == null || image2 == null) {
+    public static BufferedImage performXOR(BufferedImage source, BufferedImage fractal, boolean encrypt) {
+        if (source == null || fractal == null) {
             throw new IllegalArgumentException("Images cannot be null");
         }
-        if (image1.getWidth() != image2.getWidth() || image1.getHeight() != image2.getHeight()) {
+        if (source.getWidth() != fractal.getWidth() || source.getHeight() != fractal.getHeight()) {
             throw new IllegalArgumentException("Images must have the same dimensions");
         }
-        int width = image1.getWidth();
-        int height = image1.getHeight();
 
-        // Используем тип с альфа-каналом
-        BufferedImage resultImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        int width = source.getWidth();
+        int height = source.getHeight();
+        BufferedImage result = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                int rgb1 = image1.getRGB(x, y);
-                int rgb2 = image2.getRGB(x, y);
+                int srcPixel = source.getRGB(x, y);
+                int fracPixel = fractal.getRGB(x, y);
 
-                // Сохраняем альфа-канал из исходного изображения
-                int alpha = (rgb1 >> 24) & 0xFF;
+                int srcA = (srcPixel >> 24) & 0xFF;
+                int srcR = (srcPixel >> 16) & 0xFF;
+                int srcG = (srcPixel >> 8) & 0xFF;
+                int srcB = srcPixel & 0xFF;
 
-                // Применяем XOR только к RGB компонентам
-                int xorRGB = (rgb1 & 0x00FFFFFF) ^ (rgb2 & 0x00FFFFFF);
+                int fracR = (fracPixel >> 16) & 0xFF;
+                int fracG = (fracPixel >> 8) & 0xFF;
+                int fracB = fracPixel & 0xFF;
 
-                // Восстанавливаем альфа-канал
-                xorRGB = (alpha << 24) | (xorRGB & 0x00FFFFFF);
+                if (encrypt) {
+                    if (srcA == 0) {
+                        int markerB = (fracB & 0xFE);
+                        result.setRGB(x, y, 0xFF000000 | (fracR << 16) | (fracG << 8) | markerB);
+                    } else {
+                        int xorR = srcR ^ fracR;
+                        int xorG = srcG ^ fracG;
+                        int xorB = srcB ^ fracB;
+                        xorB = (xorB & 0xFE) | 0x01;
+                        result.setRGB(x, y, (srcA << 24) | (xorR << 16) | (xorG << 8) | xorB);
+                    }
+                } else {
+                    int encA = (srcPixel >> 24) & 0xFF;
+                    int encR = (srcPixel >> 16) & 0xFF;
+                    int encG = (srcPixel >> 8) & 0xFF;
+                    int encB = srcPixel & 0xFF;
 
-                resultImage.setRGB(x, y, xorRGB);
+                    boolean isCat = (encB & 0x01) == 1;
+
+                    if (!isCat) {
+                        result.setRGB(x, y, 0x00000000);
+                    } else {
+                        int origR = encR ^ fracR;
+                        int origG = encG ^ fracG;
+                        int origB = (encB & 0xFE) ^ fracB;
+                        result.setRGB(x, y, (encA << 24) | (origR << 16) | (origG << 8) | origB);
+                    }
+                }
             }
         }
-        return resultImage;
+        return result;
     }
 }

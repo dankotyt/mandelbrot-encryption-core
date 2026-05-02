@@ -71,7 +71,8 @@ class ImageUtilsTest {
 
     @Test
     void imageToBytes_shouldConvertCorrectly() {
-        BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB);
+        BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB);
+        // Устанавливаем пиксели с альфа-каналом = 0xFF
         image.setRGB(0, 0, 0xFF112233);
         image.setRGB(1, 0, 0xFF445566);
         image.setRGB(0, 1, 0xFF778899);
@@ -79,29 +80,23 @@ class ImageUtilsTest {
 
         byte[] bytes = imageUtils.imageToBytes(image);
 
-        assertEquals(2 * 2 * 3, bytes.length);
+        assertEquals(2 * 2 * 4, bytes.length);  // 16 байт
 
-        // Проверяем первый пиксель
-        assertEquals(0x11, bytes[0] & 0xFF);
-        assertEquals(0x22, bytes[1] & 0xFF);
-        assertEquals(0x33, bytes[2] & 0xFF);
+        // Проверяем первый пиксель (ARGB)
+        assertEquals((byte)0xFF, bytes[0]); // Alpha
+        assertEquals(0x11, bytes[1] & 0xFF); // Red
+        assertEquals(0x22, bytes[2] & 0xFF); // Green
+        assertEquals(0x33, bytes[3] & 0xFF); // Blue
     }
 
     @Test
     void bytesToImage_shouldConvertCorrectly() {
-        byte[] bytes = new byte[2 * 2 * 3];
-        bytes[0] = 0x11;
-        bytes[1] = 0x22;
-        bytes[2] = 0x33;
-        bytes[3] = 0x44;
-        bytes[4] = 0x55;
-        bytes[5] = 0x66;
-        bytes[6] = 0x77;
-        bytes[7] = (byte) 0x88;
-        bytes[8] = (byte) 0x99;
-        bytes[9] = (byte) 0xAA;
-        bytes[10] = (byte) 0xBB;
-        bytes[11] = (byte) 0xCC;
+        // 2x2 * 4 = 16 байт
+        byte[] bytes = new byte[16];
+        bytes[0] = (byte)0xFF; bytes[1] = 0x11; bytes[2] = 0x22; bytes[3] = 0x33;
+        bytes[4] = (byte)0xFF; bytes[5] = 0x44; bytes[6] = 0x55; bytes[7] = 0x66;
+        bytes[8] = (byte)0xFF; bytes[9] = 0x77; bytes[10] = (byte)0x88; bytes[11] = (byte)0x99;
+        bytes[12] = (byte)0xFF; bytes[13] = (byte)0xAA; bytes[14] = (byte)0xBB; bytes[15] = (byte)0xCC;
 
         BufferedImage image = imageUtils.bytesToImage(bytes, 2, 2);
 

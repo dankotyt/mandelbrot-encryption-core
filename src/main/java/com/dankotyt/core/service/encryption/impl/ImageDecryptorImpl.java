@@ -8,7 +8,6 @@ import com.dankotyt.core.service.encryption.util.HKDF;
 import com.dankotyt.core.service.encryption.util.XOR;
 import com.dankotyt.core.service.network.CryptoKeyManager;
 import com.dankotyt.core.utils.ImageUtils;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -22,13 +21,30 @@ import java.nio.file.Files;
 import java.security.SecureRandom;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class ImageDecryptorImpl implements ImageDecryptor {
     private final MandelbrotService mandelbrotService;
     private final SegmentShuffler segmentShuffler;
     private final ImageUtils imageUtils;
     private final CryptoKeyManager cryptoKeyManager;
+
+    /**
+     * Создаёт экземпляр дешифратора с необходимыми зависимостями.
+     *
+     * @param mandelbrotService сервис генерации фракталов Мандельброта.
+     * @param segmentShuffler   сервис перемешивания сегментов изображения.
+     * @param imageUtils        утилиты для работы с изображениями.
+     * @param cryptoKeyManager  менеджер ключей для получения общего секрета.
+     */
+    public ImageDecryptorImpl(MandelbrotService mandelbrotService,
+                              SegmentShuffler segmentShuffler,
+                              ImageUtils imageUtils,
+                              CryptoKeyManager cryptoKeyManager) {
+        this.mandelbrotService = mandelbrotService;
+        this.segmentShuffler = segmentShuffler;
+        this.imageUtils = imageUtils;
+        this.cryptoKeyManager = cryptoKeyManager;
+    }
 
     /**
      * Дешифрует изображение из бинарного файла, созданного методом encryptWhole.
@@ -61,21 +77,17 @@ public class ImageDecryptorImpl implements ImageDecryptor {
         int areaHeight = buf.getInt();
         int fullWidth = buf.getInt();
         int fullHeight = buf.getInt();
-
         byte[] imageBytes = new byte[buf.remaining()];
         buf.get(imageBytes);
 
-        log.info("Decrypt: attempts={}", attempts);
+        Dimension paddedFull = segmentShuffler.getPaddedDimensions(fullWidth, fullHeight);
+        Dimension paddedArea = segmentShuffler.getPaddedDimensions(areaWidth, areaHeight);
 
-        log.info("decryptImage: fullWidth={}, fullHeight={}, imageBytes.length={}, ожидалось {}",
-                fullWidth, fullHeight, imageBytes.length, fullWidth * fullHeight * 3);
-        if (imageBytes.length != fullWidth * fullHeight * 3) {
-            throw new IllegalArgumentException(String.format(
-                    "Несоответствие длины: получили %d, ожидали %d (ширина %d, высота %d)",
-                    imageBytes.length, fullWidth * fullHeight * 3, fullWidth, fullHeight));
+        if (imageBytes.length != paddedFull.width * paddedFull.height * 4) {
+            throw new IllegalArgumentException("Invalid image bytes length");
         }
 
-        BufferedImage encryptedImage = imageUtils.bytesToImage(imageBytes, fullWidth, fullHeight);
+        BufferedImage encryptedImage = imageUtils.bytesToImage(imageBytes, paddedFull.width, paddedFull.height);
 
         byte[] sharedSecret = cryptoKeyManager.getMasterSeedFromDH(peerAddress);
 
@@ -89,28 +101,23 @@ public class ImageDecryptorImpl implements ImageDecryptor {
         for (int i = 0; i < Math.max(1, attempts); i++) {
             params = mandelbrotService.generateParams(paramsPrng);
         }
-        log.info("Decrypt: attempts={}, params: zoom={}, offsetX={}, offsetY={}, maxIter={}",
-                attempts, params.zoom(), params.offsetX(), params.offsetY(), params.maxIter());
 
         SecureRandom segPrng = SecureRandom.getInstance("SHA1PRNG");
         segPrng.setSeed(keySegmentation);
 
-        BufferedImage encryptedArea = encryptedImage.getSubimage(startX, startY, areaWidth, areaHeight);
+        BufferedImage encryptedArea = encryptedImage.getSubimage(startX, startY, paddedArea.width, paddedArea.height);
 
+        BufferedImage unshuffled = segmentShuffler.unshuffle(encryptedArea, segPrng);
+        BufferedImage unshuffledCore = unshuffled.getSubimage(0, 0, areaWidth, areaHeight);
         BufferedImage fractal = mandelbrotService.generateImage(
                 areaWidth, areaHeight,
-                params.zoom(), params.offsetX(), params.offsetY(), params.maxIter()
-        );
+                params.zoom(), params.offsetX(), params.offsetY(), params.maxIter());
+        BufferedImage decryptedArea = XOR.performXOR(unshuffledCore, fractal, false);
 
-        BufferedImage unshuffledArea = segmentShuffler.unshuffle(
-                encryptedArea, areaWidth, areaHeight, segPrng
-        );
-
-        BufferedImage decryptedArea = XOR.performXOR(unshuffledArea, fractal);
-
-        BufferedImage result = new BufferedImage(fullWidth, fullHeight, BufferedImage.TYPE_INT_RGB);
+        BufferedImage result = new BufferedImage(fullWidth, fullHeight, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = result.createGraphics();
-        g.drawImage(encryptedImage, 0, 0, null);
+        g.drawImage(encryptedImage.getSubimage(0, 0, fullWidth, fullHeight), 0, 0, null);
+        g.setComposite(AlphaComposite.Src);
         g.drawImage(decryptedArea, startX, startY, null);
         g.dispose();
 

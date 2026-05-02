@@ -86,11 +86,11 @@ class MandelbrotThread implements Runnable {
 
                     int color;
                     if (iter > 0) {
-                        // Внешняя точка – гладкий цвет на основе HSB
                         color = getSmoothColor(iter, zx, zy, MAX_ITER);
                     } else {
-                        // Внутренняя точка – тёмно-синий (соответствует MANDELBROT_COLOR)
                         color = 0x000040;
+//                        int pseudoRandom = ((x * 7919 + y * 6271) ^ (MAX_ITER * 31)) & 0xFFFFFF;
+//                        color = 0xFF000000 | pseudoRandom;
                     }
 
                     if (x >= 0 && x < imageWidth && y >= 0 && y < imageHeight) {
@@ -118,22 +118,21 @@ class MandelbrotThread implements Runnable {
      * @return целочисленное представление цвета RGB
      */
     private int getSmoothColor(int iter, double zx, double zy, int maxIter) {
-        // Модуль комплексного числа z
         double modZ = Math.sqrt(zx * zx + zy * zy);
-        // Предотвращаем логарифмирование нуля или слишком малых чисел
         double logModZ = Math.log(Math.max(modZ, 1.0E-7));
         double logLogModZ = Math.log(Math.max(logModZ, 1.0E-7));
-        // Гладкое значение (smooth value)
         double smooth = iter + 1.0 - logLogModZ / Math.log(2.0);
 
         // Преобразуем smooth в тон (hue) – экспериментируйте с коэффициентами для изменения палитры
         double hue = 0.95 + 2.0 * (smooth / maxIter);
-        hue = hue - Math.floor(hue); // приводим к диапазону [0, 1)
+        hue = hue - Math.floor(hue);
 
-        // Фиксированные насыщенность и яркость (можно менять по вкусу)
+        // Фиксированные насыщенность и яркость (можно менять)
         float saturation = 0.8f;
         float brightness = 1.0f;
 
-        return Color.HSBtoRGB((float) hue, saturation, brightness);
+        int rgb = Color.HSBtoRGB((float) hue, saturation, brightness);
+
+        return 0xFF000000 | (rgb & 0x00FFFFFF);
     }
 }

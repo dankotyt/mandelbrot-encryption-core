@@ -2,6 +2,7 @@ package com.dankotyt.core.service.encryption;
 
 import com.dankotyt.core.dto.SegmentationResult;
 
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.security.SecureRandom;
 
@@ -27,10 +28,10 @@ public interface SegmentShuffler {
      * Восстанавливает оригинальное изображение из перемешанного, зная начальные размеры.
      *
      * @param shuffledImage  перемешанное изображение.
-     * @param originalWidth  ширина оригинального изображения (до дополнения).
-     * @param originalHeight высота оригинального изображения.
      * @param prng           тот же детерминированный генератор, что использовался при перемешивании.
      * @return восстановленное изображение.
      */
-    BufferedImage unshuffle(BufferedImage shuffledImage, int originalWidth, int originalHeight, SecureRandom prng);
+    BufferedImage unshuffle(BufferedImage shuffledImage, SecureRandom prng);
+
+    Dimension getPaddedDimensions(int originalWidth, int originalHeight);
 }

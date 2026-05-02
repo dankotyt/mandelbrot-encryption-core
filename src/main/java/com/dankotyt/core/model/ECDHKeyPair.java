@@ -1,8 +1,5 @@
 package com.dankotyt.core.model;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.Arrays;
@@ -14,15 +11,77 @@ import java.util.Arrays;
  * @author dankotyt
  * @since 1.1.0
  */
-@Getter
 public class ECDHKeyPair {
     private final BigInteger privateKey;
     private final BigInteger[] publicKey; // [x, y]
-    @Setter
     private BigInteger[] sharedSecret; // [x, y]
     private final Instant creationTime;
-    @Setter
     private byte[] sharedSecretBytes;
+
+    /**
+     * Возвращает приватный ключ (скаляр).
+     *
+     * @return приватный ключ.
+     */
+    public BigInteger getPrivateKey() {
+        return privateKey;
+    }
+
+    /**
+     * Возвращает публичный ключ — точку на эллиптической кривой в виде массива {@code [x, y]}.
+     *
+     * @return публичный ключ.
+     */
+    public BigInteger[] getPublicKey() {
+        return publicKey;
+    }
+
+    /**
+     * Возвращает вычисленный общий секрет — точку {@code [x, y]}.
+     * Может быть {@code null}, если обмен ещё не производился.
+     *
+     * @return общий секрет или {@code null}.
+     */
+    public BigInteger[] getSharedSecret() {
+        return sharedSecret;
+    }
+
+    /**
+     * Возвращает момент времени создания данной пары ключей.
+     *
+     * @return время создания.
+     */
+    public Instant getCreationTime() {
+        return creationTime;
+    }
+
+    /**
+     * Возвращает общий секрет в виде байтового массива, готового для использования в HKDF.
+     * Может быть {@code null}, если секрет ещё не вычислен.
+     *
+     * @return байтовый массив общего секрета или {@code null}.
+     */
+    public byte[] getSharedSecretBytes() {
+        return sharedSecretBytes;
+    }
+
+    /**
+     * Устанавливает общий секрет, полученный в результате скалярного умножения.
+     *
+     * @param sharedSecret точка {@code [x, y]}, представляющая общий секрет.
+     */
+    public void setSharedSecret(BigInteger[] sharedSecret) {
+        this.sharedSecret = sharedSecret;
+    }
+
+    /**
+     * Устанавливает байтовое представление общего секрета.
+     *
+     * @param sharedSecretBytes массив байтов общего секрета.
+     */
+    public void setSharedSecretBytes(byte[] sharedSecretBytes) {
+        this.sharedSecretBytes = sharedSecretBytes;
+    }
 
     /**
      * Создаёт пару ключей с заданным приватным ключом, публичной точкой и временем создания.

@@ -3,7 +3,6 @@ package com.dankotyt.core.service.encryption.impl;
 import com.dankotyt.core.dto.SegmentationResult;
 import com.dankotyt.core.service.encryption.SegmentShuffler;
 import com.dankotyt.core.service.encryption.SegmentSizeStrategy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -24,11 +23,20 @@ import java.util.Map;
  * @since 1.1.0
  */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class ImageSegmentShufflerImpl implements SegmentShuffler {
 
     private final SegmentSizeStrategy sizeStrategy;
+
+    /**
+     * Создаёт реализацию перемешивания сегментов с указанной стратегией размера сегмента.
+     *
+     * @param sizeStrategy стратегия, определяющая размер квадратного сегмента
+     *                     в зависимости от размеров изображения.
+     */
+    public ImageSegmentShufflerImpl(SegmentSizeStrategy sizeStrategy) {
+        this.sizeStrategy = sizeStrategy;
+    }
 
     /**
      * Создает список сегментов изображения заданного размера
@@ -100,15 +108,16 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
      * что и при шифровании, для получения обратного порядка сегментов.
      *
      * @param shuffledImage  перемешанное изображение
-     * @param originalWidth  оригинальная ширина изображения (до дополнения)
-     * @param originalHeight оригинальная высота изображения (до дополнения)
      * @return изображение с восстановленным порядком сегментов
      */
     @Override
-    public BufferedImage unshuffle(BufferedImage shuffledImage, int originalWidth, int originalHeight, SecureRandom prng) {
+    public BufferedImage unshuffle(BufferedImage shuffledImage, SecureRandom prng) {
         if (shuffledImage == null) {
             throw new IllegalArgumentException("Shuffled image cannot be null");
         }
+        int originalWidth = shuffledImage.getWidth();
+        int originalHeight = shuffledImage.getHeight();
+
         if (originalWidth <= 0 || originalHeight <= 0) {
             throw new IllegalArgumentException("Original dimensions must be positive");
         }
@@ -136,6 +145,26 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
     }
 
     /**
+     * Вычисляет размеры изображения, которое получится после дополнения (паддинга)
+     * до границ, кратных размеру сегмента, определяемому внутренней стратегией.
+     * Позволяет узнать, сколько пикселей будет у финального изображения после
+     * сегментации без фактического выполнения паддинга.
+     *
+     * @param originalWidth  исходная ширина изображения
+     * @param originalHeight исходная высота изображения
+     * @return объект {@link Dimension} с шириной и высотой после паддинга
+     *
+     * @since 1.2.0
+     */
+    @Override
+    public Dimension getPaddedDimensions(int originalWidth, int originalHeight) {
+        int segSize = sizeStrategy.determineSegmentSize(originalWidth, originalHeight);
+        int paddedW = (int) Math.ceil((double) originalWidth / segSize) * segSize;
+        int paddedH = (int) Math.ceil((double) originalHeight / segSize) * segSize;
+        return new Dimension(paddedW, paddedH);
+    }
+
+    /**
      * Дополняет изображение прозрачными пикселями до размеров, кратных размеру сегмента.
      * Дополнение добавляется справа и снизу изображения.
      *
@@ -144,18 +173,13 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
      * @return дополненное изображение или исходное, если дополнение не требуется
      */
     public BufferedImage padImageToSegmentSize(BufferedImage image, int segmentSize) {
-        if (image == null) {
-            throw new IllegalArgumentException("Image cannot be null");
-        }
-        if (segmentSize <= 0) {
-            throw new IllegalArgumentException("Segment size must be positive");
-        }
+        if (image == null) throw new IllegalArgumentException("Image cannot be null");
+        if (segmentSize <= 0) throw new IllegalArgumentException("Segment size must be positive");
+
         int newWidth = (int) Math.ceil((double) image.getWidth() / segmentSize) * segmentSize;
         int newHeight = (int) Math.ceil((double) image.getHeight() / segmentSize) * segmentSize;
 
-        if (image.getWidth() == newWidth && image.getHeight() == newHeight) {
-            return image;
-        }
+        if (image.getWidth() == newWidth && image.getHeight() == newHeight) return image;
 
         BufferedImage paddedImage = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = paddedImage.createGraphics();

@@ -11,6 +11,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.net.InetAddress;
@@ -54,20 +55,27 @@ class ImageDecryptorImplTest {
         int fullWidth = 100, fullHeight = 80;
         int areaWidth = 50, areaHeight = 40;
 
-        BufferedImage encryptedImage = new BufferedImage(fullWidth, fullHeight, BufferedImage.TYPE_INT_RGB);
-        BufferedImage fractalArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_RGB);
-        BufferedImage unshuffledArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_RGB);
+        // Мокируем паддинг: для простоты делаем его равным исходным размерам (например, сегмент=1)
+        Dimension paddedFull = new Dimension(fullWidth, fullHeight);
+        Dimension paddedArea = new Dimension(areaWidth, areaHeight);
+        when(segmentShuffler.getPaddedDimensions(fullWidth, fullHeight)).thenReturn(paddedFull);
+        when(segmentShuffler.getPaddedDimensions(areaWidth, areaHeight)).thenReturn(paddedArea);
 
-        when(imageUtils.bytesToImage(any(byte[].class), eq(fullWidth), eq(fullHeight)))
+        BufferedImage encryptedImage = new BufferedImage(paddedFull.width, paddedFull.height, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage fractalArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage unshuffledArea = new BufferedImage(paddedArea.width, paddedArea.height, BufferedImage.TYPE_INT_ARGB);
+
+        when(imageUtils.bytesToImage(any(byte[].class), eq(paddedFull.width), eq(paddedFull.height)))
                 .thenReturn(encryptedImage);
         when(mandelbrotService.generateImage(eq(areaWidth), eq(areaHeight), anyDouble(), anyDouble(), anyDouble(), anyInt()))
                 .thenReturn(fractalArea);
-        when(segmentShuffler.unshuffle(any(BufferedImage.class), eq(areaWidth), eq(areaHeight), any(SecureRandom.class)))
+        when(segmentShuffler.unshuffle(any(BufferedImage.class), any(SecureRandom.class)))
                 .thenReturn(unshuffledArea);
 
         int attempts = 3;
         int startX = 10, startY = 10;
-        byte[] imageBytes = new byte[fullWidth * fullHeight * 3];
+        // imageBytes должен соответствовать padded размеру * 4
+        byte[] imageBytes = new byte[paddedFull.width * paddedFull.height * 4];
         ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + imageBytes.length);
         buffer.put(new byte[16]); // salt
         buffer.putInt(attempts);
@@ -91,7 +99,7 @@ class ImageDecryptorImplTest {
         verify(mandelbrotService, times(1))
                 .generateImage(eq(areaWidth), eq(areaHeight), anyDouble(), anyDouble(), anyDouble(), anyInt());
         verify(segmentShuffler, times(1))
-                .unshuffle(any(BufferedImage.class), eq(areaWidth), eq(areaHeight), any(SecureRandom.class));
+                .unshuffle(any(BufferedImage.class), any(SecureRandom.class));
 
         Files.deleteIfExists(tempFile);
     }
@@ -99,6 +107,10 @@ class ImageDecryptorImplTest {
     @Test
     void decryptImage_withInvalidLength_shouldThrow() throws Exception {
         int fullWidth = 100, fullHeight = 80;
+        // мок для getPaddedDimensions должен вернуть что-то не-null
+        when(segmentShuffler.getPaddedDimensions(anyInt(), anyInt()))
+                .thenReturn(new Dimension(fullWidth*2, fullHeight*2)); // намеренно большое, чтобы проверка длины не прошла
+
         ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + 1);
         buffer.put(new byte[16]);
         buffer.putInt(1);
@@ -122,19 +134,24 @@ class ImageDecryptorImplTest {
         int fullWidth = 10, fullHeight = 10;
         int areaWidth = 10, areaHeight = 10;
 
-        BufferedImage encryptedImage = new BufferedImage(fullWidth, fullHeight, BufferedImage.TYPE_INT_RGB);
-        BufferedImage fractalArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_RGB);
-        BufferedImage unshuffledArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_RGB);
+        Dimension paddedFull = new Dimension(fullWidth, fullHeight);
+        Dimension paddedArea = new Dimension(areaWidth, areaHeight);
+        when(segmentShuffler.getPaddedDimensions(fullWidth, fullHeight)).thenReturn(paddedFull);
+        when(segmentShuffler.getPaddedDimensions(areaWidth, areaHeight)).thenReturn(paddedArea);
 
-        when(imageUtils.bytesToImage(any(byte[].class), eq(fullWidth), eq(fullHeight)))
+        BufferedImage encryptedImage = new BufferedImage(paddedFull.width, paddedFull.height, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage fractalArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage unshuffledArea = new BufferedImage(paddedArea.width, paddedArea.height, BufferedImage.TYPE_INT_ARGB);
+
+        when(imageUtils.bytesToImage(any(byte[].class), eq(paddedFull.width), eq(paddedFull.height)))
                 .thenReturn(encryptedImage);
         when(mandelbrotService.generateImage(eq(areaWidth), eq(areaHeight), anyDouble(), anyDouble(), anyDouble(), anyInt()))
                 .thenReturn(fractalArea);
-        when(segmentShuffler.unshuffle(any(BufferedImage.class), eq(areaWidth), eq(areaHeight), any(SecureRandom.class)))
+        when(segmentShuffler.unshuffle(any(BufferedImage.class), any(SecureRandom.class)))
                 .thenReturn(unshuffledArea);
 
         int attempts = 0;
-        byte[] imageBytes = new byte[fullWidth * fullHeight * 3];
+        byte[] imageBytes = new byte[paddedFull.width * paddedFull.height * 4];
         ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + imageBytes.length);
         buffer.put(new byte[16]);
         buffer.putInt(attempts);
@@ -159,20 +176,24 @@ class ImageDecryptorImplTest {
         int fullWidth = 100, fullHeight = 100;
         int areaWidth = 30, areaHeight = 30;
 
-        BufferedImage encryptedImage = new BufferedImage(fullWidth, fullHeight, BufferedImage.TYPE_INT_RGB);
-        BufferedImage fractalArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_RGB);
-        BufferedImage unshuffledArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_RGB);
+        Dimension paddedFull = new Dimension(fullWidth, fullHeight);
+        Dimension paddedArea = new Dimension(areaWidth, areaHeight);
+        when(segmentShuffler.getPaddedDimensions(anyInt(), anyInt())).thenReturn(paddedFull, paddedArea);
 
-        when(imageUtils.bytesToImage(any(byte[].class), eq(fullWidth), eq(fullHeight)))
+        BufferedImage encryptedImage = new BufferedImage(paddedFull.width, paddedFull.height, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage fractalArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage unshuffledArea = new BufferedImage(paddedArea.width, paddedArea.height, BufferedImage.TYPE_INT_ARGB);
+
+        when(imageUtils.bytesToImage(any(byte[].class), eq(paddedFull.width), eq(paddedFull.height)))
                 .thenReturn(encryptedImage);
         when(mandelbrotService.generateImage(eq(areaWidth), eq(areaHeight), anyDouble(), anyDouble(), anyDouble(), anyInt()))
                 .thenReturn(fractalArea);
-        when(segmentShuffler.unshuffle(any(BufferedImage.class), eq(areaWidth), eq(areaHeight), any(SecureRandom.class)))
+        when(segmentShuffler.unshuffle(any(BufferedImage.class), any(SecureRandom.class)))
                 .thenReturn(unshuffledArea);
 
         int attempts = 1;
         int startX = 5, startY = 5;
-        byte[] imageBytes = new byte[fullWidth * fullHeight * 3];
+        byte[] imageBytes = new byte[paddedFull.width * paddedFull.height * 4];
         ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + imageBytes.length);
         buffer.put(new byte[16]);
         buffer.putInt(attempts);
@@ -197,20 +218,24 @@ class ImageDecryptorImplTest {
         int fullWidth = 200, fullHeight = 200;
         int areaWidth = 150, areaHeight = 150;
 
-        BufferedImage encryptedImage = new BufferedImage(fullWidth, fullHeight, BufferedImage.TYPE_INT_RGB);
-        BufferedImage fractalArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_RGB);
-        BufferedImage unshuffledArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_RGB);
+        Dimension paddedFull = new Dimension(fullWidth, fullHeight);
+        Dimension paddedArea = new Dimension(areaWidth, areaHeight);
+        when(segmentShuffler.getPaddedDimensions(anyInt(), anyInt())).thenReturn(paddedFull, paddedArea);
 
-        when(imageUtils.bytesToImage(any(byte[].class), eq(fullWidth), eq(fullHeight)))
+        BufferedImage encryptedImage = new BufferedImage(paddedFull.width, paddedFull.height, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage fractalArea = new BufferedImage(areaWidth, areaHeight, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage unshuffledArea = new BufferedImage(paddedArea.width, paddedArea.height, BufferedImage.TYPE_INT_ARGB);
+
+        when(imageUtils.bytesToImage(any(byte[].class), eq(paddedFull.width), eq(paddedFull.height)))
                 .thenReturn(encryptedImage);
         when(mandelbrotService.generateImage(eq(areaWidth), eq(areaHeight), anyDouble(), anyDouble(), anyDouble(), anyInt()))
                 .thenReturn(fractalArea);
-        when(segmentShuffler.unshuffle(any(BufferedImage.class), eq(areaWidth), eq(areaHeight), any(SecureRandom.class)))
+        when(segmentShuffler.unshuffle(any(BufferedImage.class), any(SecureRandom.class)))
                 .thenReturn(unshuffledArea);
 
         int attempts = 2;
         int startX = 25, startY = 25;
-        byte[] imageBytes = new byte[fullWidth * fullHeight * 3];
+        byte[] imageBytes = new byte[paddedFull.width * paddedFull.height * 4];
         ByteBuffer buffer = ByteBuffer.allocate(16 + 4 + 24 + imageBytes.length);
         buffer.put(new byte[16]);
         buffer.putInt(attempts);

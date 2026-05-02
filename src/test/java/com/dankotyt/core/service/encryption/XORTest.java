@@ -19,7 +19,7 @@ class XORTest {
         // Используем TYPE_INT_RGB, чтобы избежать проблем с альфа-каналом
         img1.setRGB(0, 0, 0x112233);
         img2.setRGB(0, 0, 0x445566);
-        BufferedImage result = XOR.performXOR(img1, img2);
+        BufferedImage result = XOR.performXOR(img1, img2, true);
 
         int actual = result.getRGB(0, 0) & 0x00FFFFFF; // Убираем альфа-канал
         int expected = (0x112233 ^ 0x445566) & 0x00FFFFFF;
@@ -33,7 +33,7 @@ class XORTest {
         BufferedImage img2 = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         img1.setRGB(0, 0, 0x80112233);
         img2.setRGB(0, 0, 0xFF445566);
-        int result = XOR.performXOR(img1, img2).getRGB(0, 0);
+        int result = XOR.performXOR(img1, img2, true).getRGB(0, 0);
         int expected = (0x80 << 24) | ((0x112233 ^ 0x445566) & 0x00FFFFFF);
         assertEquals(expected, result);
     }
@@ -43,6 +43,6 @@ class XORTest {
     void performXOR_withDifferentSizes_shouldThrow() {
         BufferedImage img1 = new BufferedImage(100, 100, BufferedImage.TYPE_INT_RGB);
         BufferedImage img2 = new BufferedImage(200, 200, BufferedImage.TYPE_INT_RGB);
-        assertThrows(IllegalArgumentException.class, () -> XOR.performXOR(img1, img2));
+        assertThrows(IllegalArgumentException.class, () -> XOR.performXOR(img1, img2, true));
     }
 }

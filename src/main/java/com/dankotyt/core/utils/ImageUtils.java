@@ -1,9 +1,6 @@
 package com.dankotyt.core.utils;
 
 import com.dankotyt.core.dto.MandelbrotParams;
-import lombok.Getter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
@@ -16,24 +13,47 @@ import java.awt.image.BufferedImage;
  * @author dankotyt
  * @since 1.1.0
  */
-@Getter
 @Component
 public class ImageUtils {
-    private static final Logger logger = LoggerFactory.getLogger(ImageUtils.class);
 
     private BufferedImage originalImage;
     private BufferedImage mandelbrotImage;
     private MandelbrotParams mandelbrotParams;
 
     /**
+     * Возвращает сохранённое оригинальное изображение.
+     *
+     * @return оригинальное изображение или {@code null}, если оно не было установлено.
+     */
+    public BufferedImage getOriginalImage() {
+        return originalImage;
+    }
+
+    /**
+     * Возвращает сохранённое изображение фрактала Мандельброта.
+     *
+     * @return изображение фрактала или {@code null}, если оно не было установлено.
+     */
+    public BufferedImage getMandelbrotImage() {
+        return mandelbrotImage;
+    }
+
+    /**
+     * Возвращает параметры, с которыми было сгенерировано сохранённое изображение фрактала.
+     *
+     * @return параметры фрактала или {@code null}.
+     */
+    public MandelbrotParams getMandelbrotParams() {
+        return mandelbrotParams;
+    }
+
+    /**
      * Сохраняет оригинальное изображение.
      *
-     * @param image изображение для сохранения
+     * @param originalImage изображение для сохранения; может быть {@code null}.
      */
-    public void setOriginalImage(BufferedImage image) {
-        this.originalImage = image;
-        logger.info("ImageUtils: оригинальное изображение установлено, размер: {}x{}, instance: {}",
-                image.getWidth(), image.getHeight(), this.hashCode());
+    public void setOriginalImage(BufferedImage originalImage) {
+        this.originalImage = originalImage;
     }
 
     /**
@@ -42,9 +62,7 @@ public class ImageUtils {
      * @return true, если оригинальное изображение установлено
      */
     public boolean hasOriginalImage() {
-        boolean hasImage = originalImage != null;
-        logger.info("ImageUtils: проверка hasOriginalImage() = {}, instance: {}", hasImage, this.hashCode());
-        return hasImage;
+        return originalImage != null;
     }
 
     /**
@@ -89,46 +107,53 @@ public class ImageUtils {
     }
 
     /**
-     * Конвертирует BufferedImage в массив байт (RGB, 3 байта на пиксель).
+     * Конвертирует BufferedImage в массив байт (ARGB, 4 байта на пиксель).
+     * Порядок каналов: альфа, красный, зелёный, синий.
      *
      * @param image изображение для конвертации
-     * @return байтовый массив размером width * height * 3
+     * @return байтовый массив размером width * height * 4
+     *
+     * @since 1.2.0
      */
     public byte[] imageToBytes(BufferedImage image) {
         int width = image.getWidth(), height = image.getHeight();
-        byte[] bytes = new byte[width * height * 3];
+        byte[] bytes = new byte[width * height * 4];
         int idx = 0;
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                int rgb = image.getRGB(x, y);
-                bytes[idx++] = (byte) ((rgb >> 16) & 0xFF);
-                bytes[idx++] = (byte) ((rgb >> 8) & 0xFF);
-                bytes[idx++] = (byte) (rgb & 0xFF);
+                int argb = image.getRGB(x, y);
+                bytes[idx++] = (byte) ((argb >> 24) & 0xFF); // alpha
+                bytes[idx++] = (byte) ((argb >> 16) & 0xFF); // red
+                bytes[idx++] = (byte) ((argb >> 8) & 0xFF);  // green
+                bytes[idx++] = (byte) (argb & 0xFF);         // blue
             }
         }
         return bytes;
     }
 
     /**
-     * Конвертирует массив байт обратно в BufferedImage.
+     * Конвертирует массив байт обратно в BufferedImage с альфа-каналом.
      *
-     * @param bytes  байтовый массив (формат RGB, 3 байта на пиксель)
+     * @param bytes  байтовый массив в формате ARGB (4 байта на пиксель)
      * @param width  ширина изображения
      * @param height высота изображения
-     * @return восстановленное изображение
-     * @throws IllegalArgumentException если размер массива не соответствует width * height * 3
+     * @return восстановленное изображение с типом TYPE_INT_ARGB
+     * @throws IllegalArgumentException если размер массива не соответствует width * height * 4
+     *
+     * @since 1.2.0
      */
     public BufferedImage bytesToImage(byte[] bytes, int width, int height) {
-        if (bytes.length != width * height * 3)
-            throw new IllegalArgumentException("Invalid byte array length");
-        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        if (bytes.length != width * height * 4)
+            throw new IllegalArgumentException("Invalid byte array length. Expected " + width * height * 4 + " bytes but got " + bytes.length);
+        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         int idx = 0;
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
+                int a = bytes[idx++] & 0xFF;
                 int r = bytes[idx++] & 0xFF;
                 int g = bytes[idx++] & 0xFF;
                 int b = bytes[idx++] & 0xFF;
-                img.setRGB(x, y, (r << 16) | (g << 8) | b);
+                img.setRGB(x, y, (a << 24) | (r << 16) | (g << 8) | b);
             }
         }
         return img;

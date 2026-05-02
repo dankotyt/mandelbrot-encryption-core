@@ -60,7 +60,6 @@ class ImageSegmentShufflerImplTest {
         SecureRandom prng = SecureRandom.getInstance("SHA1PRNG");
         prng.setSeed(12345L);
         BufferedImage original = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
-        // fill with unique colors
         for (int y = 0; y < 10; y++) {
             for (int x = 0; x < 10; x++) {
                 int rgb = (y * 10 + x) & 0x00FFFFFF;
@@ -73,7 +72,7 @@ class ImageSegmentShufflerImplTest {
         // unshuffle
         SecureRandom samePrng = SecureRandom.getInstance("SHA1PRNG");
         samePrng.setSeed(12345L);
-        BufferedImage unshuffled = shuffler.unshuffle(shuffled, original.getWidth(), original.getHeight(), samePrng);
+        BufferedImage unshuffled = shuffler.unshuffle(shuffled, samePrng);
 
         // compare pixels
         for (int y = 0; y < original.getHeight(); y++) {
@@ -100,7 +99,7 @@ class ImageSegmentShufflerImplTest {
 
         SecureRandom samePrng = SecureRandom.getInstance("SHA1PRNG");
         samePrng.setSeed(12345L);
-        BufferedImage unshuffled = shuffler.unshuffle(shuffled, original.getWidth(), original.getHeight(), samePrng);
+        BufferedImage unshuffled = shuffler.unshuffle(shuffled, samePrng);
 
         // compare pixels
         for (int y = 0; y < original.getHeight(); y++) {
@@ -131,6 +130,6 @@ class ImageSegmentShufflerImplTest {
     @Test
     void unshuffle_withNullImage_shouldThrow() {
         SecureRandom prng = new SecureRandom();
-        assertThrows(IllegalArgumentException.class, () -> shuffler.unshuffle(null, 100, 100, prng));
+        assertThrows(IllegalArgumentException.class, () -> shuffler.unshuffle(null, prng));
     }
 }
