@@ -3,7 +3,6 @@ package com.dankotyt.core.service.encryption.impl;
 import com.dankotyt.core.model.ECDHKeyPair;
 import com.dankotyt.core.service.encryption.ECDHService;
 import com.dankotyt.core.service.encryption.util.ECDHCryptoParams;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigInteger;
@@ -19,7 +18,6 @@ import java.util.Arrays;
  * @since 1.1.0
  */
 @Service
-@Slf4j
 public class ECDHServiceImpl implements ECDHService {
 
     private final SecureRandom secureRandom = new SecureRandom();

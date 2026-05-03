@@ -8,7 +8,6 @@ import com.dankotyt.core.service.encryption.util.HKDF;
 import com.dankotyt.core.service.encryption.util.XOR;
 import com.dankotyt.core.service.network.CryptoKeyManager;
 import com.dankotyt.core.utils.ImageUtils;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
@@ -21,7 +20,6 @@ import java.nio.file.Files;
 import java.security.SecureRandom;
 
 @Component
-@Slf4j
 public class ImageDecryptorImpl implements ImageDecryptor {
     private final MandelbrotService mandelbrotService;
     private final SegmentShuffler segmentShuffler;
@@ -65,6 +63,12 @@ public class ImageDecryptorImpl implements ImageDecryptor {
 
     @Override
     public BufferedImage decryptImage(File encryptedFile, InetAddress peerAddress) throws Exception {
+        if (encryptedFile == null || !encryptedFile.exists()) {
+            throw new IllegalArgumentException("File does not exist");
+        }
+        if (peerAddress == null) {
+            throw new IllegalArgumentException("Peer address is null");
+        }
         byte[] fileData = Files.readAllBytes(encryptedFile.toPath());
         ByteBuffer buf = ByteBuffer.wrap(fileData);
 

@@ -8,7 +8,8 @@ import com.dankotyt.core.service.encryption.SegmentShuffler;
 import com.dankotyt.core.service.encryption.util.HKDF;
 import com.dankotyt.core.service.encryption.util.XOR;
 import com.dankotyt.core.utils.ImageUtils;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
@@ -27,8 +28,8 @@ import java.security.SecureRandom;
  * @since 1.1.0
  */
 @Component
-@Slf4j
 public class ImageEncryptorImpl implements ImageEncryptor {
+    private static final Logger log = LoggerFactory.getLogger(ImageEncryptorImpl.class);
 
     private final MandelbrotService mandelbrotService;
     private final SegmentShuffler segmentShuffler;

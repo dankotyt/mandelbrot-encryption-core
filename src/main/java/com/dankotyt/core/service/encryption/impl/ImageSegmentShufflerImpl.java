@@ -3,7 +3,8 @@ package com.dankotyt.core.service.encryption.impl;
 import com.dankotyt.core.dto.SegmentationResult;
 import com.dankotyt.core.service.encryption.SegmentShuffler;
 import com.dankotyt.core.service.encryption.SegmentSizeStrategy;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
@@ -23,8 +24,8 @@ import java.util.Map;
  * @since 1.1.0
  */
 @Component
-@Slf4j
 public class ImageSegmentShufflerImpl implements SegmentShuffler {
+    private static final Logger log = LoggerFactory.getLogger(ImageSegmentShufflerImpl.class);
 
     private final SegmentSizeStrategy sizeStrategy;
 
