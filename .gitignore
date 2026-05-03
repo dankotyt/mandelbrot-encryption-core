@@ -18,6 +18,7 @@ build/
 **/build/**
 *.lock
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 
 ### Eclipse ###
 .apt_generated
