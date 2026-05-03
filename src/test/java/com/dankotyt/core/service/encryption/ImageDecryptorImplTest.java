@@ -257,7 +257,7 @@ class ImageDecryptorImplTest {
 
     @Test
     void decryptImage_withNullFile_shouldThrow() {
-        assertThrows(NullPointerException.class, () -> imageDecryptor.decryptImage(null, null));
+        assertThrows(IllegalArgumentException.class, () -> imageDecryptor.decryptImage(null, null));
     }
 
     @Test
