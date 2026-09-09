@@ -1,6 +1,7 @@
 package com.dankotyt.core.service.encryption;
 
 import com.dankotyt.core.dto.SegmentationResult;
+import com.dankotyt.core.service.encryption.drbg.SHA3DRBG;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -19,19 +20,19 @@ public interface SegmentShuffler {
      * Разбивает изображение на квадратные сегменты и случайным образом переставляет их.
      *
      * @param image исходное изображение.
-     * @param prng  детерминированный генератор для перемешивания.
+     * @param drbg  детерминированный генератор для перемешивания.
      * @return результат перемешивания, включающий перемешанное изображение и размер сегмента.
      */
-    SegmentationResult segmentAndShuffle(BufferedImage image, SecureRandom prng);
+    SegmentationResult segmentAndShuffle(BufferedImage image, SHA3DRBG drbg);
 
     /**
      * Восстанавливает оригинальное изображение из перемешанного, зная начальные размеры.
      *
      * @param shuffledImage  перемешанное изображение.
-     * @param prng           тот же детерминированный генератор, что использовался при перемешивании.
+     * @param drbg           тот же детерминированный генератор, что использовался при перемешивании.
      * @return восстановленное изображение.
      */
-    BufferedImage unshuffle(BufferedImage shuffledImage, SecureRandom prng);
+    BufferedImage unshuffle(BufferedImage shuffledImage, SHA3DRBG drbg);
 
     Dimension getPaddedDimensions(int originalWidth, int originalHeight);
 }

@@ -1,5 +1,7 @@
 package com.dankotyt.core.service.encryption;
 
+import com.dankotyt.core.dto.EncryptedData;
+
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.net.InetAddress;
@@ -21,4 +23,7 @@ public interface ImageDecryptor {
      * @throws Exception если возникают ошибки ввода-вывода, повреждены данные или отсутствует ключ для пира.
      */
     BufferedImage decryptImage(File encryptedFile, InetAddress peerAddress) throws Exception;
+
+    BufferedImage decryptImage(EncryptedData encryptedData) throws Exception;
+    void prepareSession(byte[] sharedSecret) throws Exception;
 }

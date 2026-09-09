@@ -3,8 +3,8 @@ package com.dankotyt.core.config;
 import com.dankotyt.core.service.encryption.*;
 import com.dankotyt.core.service.encryption.impl.*;
 import com.dankotyt.core.service.network.CryptoKeyManager;
-import com.dankotyt.core.service.network.impl.ECDHCryptoKeyManagerImpl;
 import com.dankotyt.core.utils.ImageUtils;
+import com.dankotyt.core.utils.SBoxUtil;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Configuration;
  *   <li>{@link MandelbrotParamsGenerator} – генератор параметров фрактала</li>
  *   <li>{@link SegmentShuffler} – перемешивание сегментов изображения</li>
  *   <li>{@link SegmentSizeStrategy} – стратегия выбора размера сегмента</li>
- *   <li>{@link ECDHService} – криптография на эллиптических кривых</li>
  *   <li>{@link CryptoKeyManager} – управление ключами и общим секретом</li>
  *   <li>{@link ImageEncryptor} – шифрование изображений</li>
  *   <li>{@link ImageDecryptor} – дешифрование изображений</li>
@@ -69,6 +68,12 @@ public class EncryptionAutoConfiguration {
         return new ImageUtils();
     }
 
+    @Bean
+    @ConditionalOnMissingBean
+    public SBoxUtil sBoxUtil() {
+        return new SBoxUtil();
+    }
+
     /**
      * Создаёт бин {@link MandelbrotService} для генерации фракталов Мандельброта.
      *
@@ -113,28 +118,6 @@ public class EncryptionAutoConfiguration {
         return new SegmentSizeStrategyImpl();
     }
 
-    /**
-     * Создаёт бин {@link ECDHService} для операций на эллиптической кривой.
-     *
-     * @return экземпляр ECDHServiceImpl
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public ECDHService ecdhService() {
-        return new ECDHServiceImpl();
-    }
-
-    /**
-     * Создаёт бин {@link CryptoKeyManager} для управления ECDH-ключами.
-     *
-     * @param ecdhService сервис криптографических операций
-     * @return экземпляр ECDHCryptoKeyManagerImpl
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public CryptoKeyManager cryptoKeyManager(ECDHService ecdhService) {
-        return new ECDHCryptoKeyManagerImpl(ecdhService);
-    }
 
     /**
      * Создаёт бин {@link ImageEncryptor} для шифрования изображений.
@@ -148,8 +131,8 @@ public class EncryptionAutoConfiguration {
     @ConditionalOnMissingBean
     public ImageEncryptor imageEncryptor(MandelbrotService mandelbrotService,
                                          SegmentShuffler segmentShuffler,
-                                         ImageUtils imageUtils) {
-        return new ImageEncryptorImpl(mandelbrotService, segmentShuffler, imageUtils);
+                                         ImageUtils imageUtils, SBoxUtil sBoxUtil) {
+        return new ImageEncryptorImpl(mandelbrotService, segmentShuffler, imageUtils, sBoxUtil);
     }
 
     /**
@@ -166,7 +149,7 @@ public class EncryptionAutoConfiguration {
     public ImageDecryptor imageDecryptor(MandelbrotService mandelbrotService,
                                          SegmentShuffler segmentShuffler,
                                          ImageUtils imageUtils,
-                                         CryptoKeyManager cryptoKeyManager) {
-        return new ImageDecryptorImpl(mandelbrotService, segmentShuffler, imageUtils, cryptoKeyManager);
+                                         CryptoKeyManager cryptoKeyManager, SBoxUtil sBoxUtil) {
+        return new ImageDecryptorImpl(mandelbrotService, segmentShuffler, imageUtils, cryptoKeyManager, sBoxUtil);
     }
 }

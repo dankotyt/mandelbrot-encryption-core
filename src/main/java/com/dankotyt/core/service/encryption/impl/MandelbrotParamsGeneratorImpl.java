@@ -2,6 +2,8 @@ package com.dankotyt.core.service.encryption.impl;
 
 import com.dankotyt.core.dto.MandelbrotParams;
 import com.dankotyt.core.service.encryption.MandelbrotParamsGenerator;
+import com.dankotyt.core.service.encryption.drbg.SHA3DRBG;
+
 import java.security.SecureRandom;
 
 /**
@@ -107,6 +109,19 @@ public class MandelbrotParamsGeneratorImpl implements MandelbrotParamsGenerator 
         double offsetYMax = useNegativeY ? offsetYNegMax : offsetYPosMax;
         double offsetY = offsetYMin + prng.nextDouble() * (offsetYMax - offsetYMin);
         int maxIter = iterBase + prng.nextInt(iterMaxSteps + 1) * iterStep;
+        return new MandelbrotParams(zoom, offsetX, offsetY, maxIter);
+    }
+
+    @Override
+    public MandelbrotParams generate(SHA3DRBG drbg) {
+        if (drbg == null) throw new IllegalArgumentException("DRBG cannot be null");
+        double zoom = zoomMin + drbg.nextDouble() * (zoomMax - zoomMin);
+        double offsetX = offsetXMin + drbg.nextDouble() * (offsetXMax - offsetXMin);
+        boolean useNegativeY = drbg.nextBoolean();
+        double offsetYMin = useNegativeY ? offsetYNegMin : offsetYPosMin;
+        double offsetYMax = useNegativeY ? offsetYNegMax : offsetYPosMax;
+        double offsetY = offsetYMin + drbg.nextDouble() * (offsetYMax - offsetYMin);
+        int maxIter = iterBase + drbg.nextInt(iterMaxSteps + 1) * iterStep;
         return new MandelbrotParams(zoom, offsetX, offsetY, maxIter);
     }
 }

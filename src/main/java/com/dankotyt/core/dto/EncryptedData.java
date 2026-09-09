@@ -1,5 +1,8 @@
 package com.dankotyt.core.dto;
 
+import java.io.Serial;
+import java.io.Serializable;
+
 /**
  * DTO, содержащее все метаданные и зашифрованное изображение.
  * Используется как результат шифрования и для последующего дешифрования.
@@ -19,4 +22,7 @@ package com.dankotyt.core.dto;
  */
 public record EncryptedData(byte[] sessionSalt, int attemptCount, int startX, int startY,
                             int areaWidth, int areaHeight, int originalWidth, int originalHeight,
-                            byte[] imageBytes) {}
+                            byte[] imageBytes) implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1L;
+}

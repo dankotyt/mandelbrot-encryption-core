@@ -1,6 +1,7 @@
 package com.dankotyt.core.service.network;
 
-import com.dankotyt.core.model.ECDHKeyPair;
+import com.dankotyt.core.model.KyberKeyPair;
+
 import java.net.InetAddress;
 import java.util.Map;
 
@@ -27,22 +28,9 @@ public interface CryptoKeyManager {
      */
     void generateNewKeys();
 
-    /**
-     * Текущая локальная пара ключей.
-     *
-     * @return объект {@link ECDHKeyPair}.
-     */
-    ECDHKeyPair getCurrentKeys();
+    KyberKeyPair getCurrentKyberKeys();
 
-    /**
-     * Регистрирует пира, вычисляет общий секрет на основе локального приватного ключа
-     * и публичного ключа пира, сохраняет результат.
-     *
-     * @param peerAddress адрес пира.
-     * @param peerKeyPair ключевая пара пира (содержит публичный ключ).
-     * @throws IllegalArgumentException если адрес или ключ равны null.
-     */
-    void addPeer(InetAddress peerAddress, ECDHKeyPair peerKeyPair);
+    void addPeer(InetAddress peerAddress, KyberKeyPair peerKeyPair);
 
     /**
      * Удаляет пира и безопасно стирает его общий секрет.
@@ -61,10 +49,5 @@ public interface CryptoKeyManager {
      */
     boolean hasPeer(InetAddress peerAddress);
 
-    /**
-     * Возвращает независимую копию всех активных пиров и их ключевых пар.
-     *
-     * @return копия Map (InetAddress -> ECDHKeyPair).
-     */
-    Map<InetAddress, ECDHKeyPair> getActivePeers();
+    Map<InetAddress, KyberKeyPair> getActivePeersKyber();
 }

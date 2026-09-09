@@ -1,6 +1,7 @@
 package com.dankotyt.core.service.encryption;
 
 import com.dankotyt.core.dto.MandelbrotParams;
+import com.dankotyt.core.service.encryption.drbg.SHA3DRBG;
 import com.dankotyt.core.service.encryption.impl.MandelbrotParamsGeneratorImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,7 +10,6 @@ import org.springframework.stereotype.Component;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -90,8 +90,8 @@ public class MandelbrotService {
     /**
      * Генерирует параметры фрактала на основе детерминированного SecureRandom.
      */
-    public MandelbrotParams generateParams(SecureRandom prng) {
-        return paramsGenerator.generate(prng);
+    public MandelbrotParams generateParams(SHA3DRBG drbg) {
+        return paramsGenerator.generate(drbg);
     }
 
     /**
@@ -241,5 +241,48 @@ public class MandelbrotService {
         double maxRatio = (double) maxCount / totalConsidered;
 
         return nonEmpty >= minBins && maxRatio <= maxBinRatio;
+    }
+
+    /**
+     * Генерирует двумерный массив количества итераций для каждого пикселя (многопоточный).
+     */
+    public int[][] generateIterationArray(int width, int height,
+                                          double ZOOM, double offsetX, double offsetY, int MAX_ITER) {
+        int[][] iterArray = new int[height][width];
+        int processors = Runtime.getRuntime().availableProcessors();
+        int chunkHeight = height / processors;
+        ExecutorService executor = Executors.newFixedThreadPool(processors);
+        List<Future<?>> futures = new ArrayList<>();
+        for (int i = 0; i < processors; i++) {
+            int startY = i * chunkHeight;
+            int h = (i == processors - 1) ? height - startY : chunkHeight;
+            futures.add(executor.submit(() -> {
+                int centerX = width / 2;
+                int centerY = height / 2;
+                for (int y = startY; y < startY + h; y++) {
+                    for (int x = 0; x < width; x++) {
+                        double zx = 0, zy = 0;
+                        double cX = (x - centerX) / ZOOM + offsetX;
+                        double cY = (y - centerY) / ZOOM + offsetY;
+                        int iter = MAX_ITER;
+                        while (zx * zx + zy * zy < 4 && iter > 0) {
+                            double tmp = zx * zx - zy * zy + cX;
+                            zy = 2.0 * zx * zy + cY;
+                            zx = tmp;
+                            iter--;
+                        }
+                        iterArray[y][x] = iter;
+                    }
+                }
+            }));
+        }
+        try {
+            for (Future<?> f : futures) f.get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException("Ошибка генерации массива итераций", e);
+        } finally {
+            executor.shutdown();
+        }
+        return iterArray;
     }
 }

@@ -5,8 +5,8 @@ import com.dankotyt.core.service.encryption.ImageEncryptor;
 import com.dankotyt.core.service.encryption.MandelbrotService;
 import com.dankotyt.core.service.encryption.impl.*;
 import com.dankotyt.core.service.network.CryptoKeyManager;
-import com.dankotyt.core.service.network.impl.ECDHCryptoKeyManagerImpl;
 import com.dankotyt.core.utils.ImageUtils;
+import com.dankotyt.core.utils.SBoxUtil;
 
 /**
  * Фабрика для создания экземпляров модуля шифрования без использования Spring.
@@ -40,16 +40,6 @@ public class EncryptionModule {
     }
 
     /**
-     * Создаёт экземпляр {@link CryptoKeyManager} с настройками по умолчанию.
-     * Использует {@link ECDHServiceImpl} для генерации ключей и управления обменом.
-     *
-     * @return готовый к работе менеджер ключей
-     */
-    public static CryptoKeyManager createKeyManager() {
-        return new ECDHCryptoKeyManagerImpl(new ECDHServiceImpl());
-    }
-
-    /**
      * Создаёт экземпляр {@link ImageEncryptor} для шифрования изображений.
      * Внутри создаются все необходимые компоненты: {@link MandelbrotService},
      * {@link ImageSegmentShufflerImpl} и {@link ImageUtils}.
@@ -60,7 +50,7 @@ public class EncryptionModule {
         return new ImageEncryptorImpl(
                 new MandelbrotService(),
                 new ImageSegmentShufflerImpl(new SegmentSizeStrategyImpl()),
-                new ImageUtils()
+                new ImageUtils(), new SBoxUtil()
         );
     }
 
@@ -77,7 +67,7 @@ public class EncryptionModule {
                 new MandelbrotService(),
                 new ImageSegmentShufflerImpl(new SegmentSizeStrategyImpl()),
                 new ImageUtils(),
-                keyManager
+                keyManager, new SBoxUtil()
         );
     }
 }

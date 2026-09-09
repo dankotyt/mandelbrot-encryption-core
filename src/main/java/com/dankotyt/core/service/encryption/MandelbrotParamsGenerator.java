@@ -1,6 +1,7 @@
 package com.dankotyt.core.service.encryption;
 
 import com.dankotyt.core.dto.MandelbrotParams;
+import com.dankotyt.core.service.encryption.drbg.SHA3DRBG;
 
 import java.security.SecureRandom;
 
@@ -20,4 +21,5 @@ public interface MandelbrotParamsGenerator {
      * @return параметры фрактала.
      */
     MandelbrotParams generate(SecureRandom prng);
+    MandelbrotParams generate(SHA3DRBG drbg);
 }

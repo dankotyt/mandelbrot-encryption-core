@@ -3,6 +3,7 @@ package com.dankotyt.core.service.encryption.impl;
 import com.dankotyt.core.dto.SegmentationResult;
 import com.dankotyt.core.service.encryption.SegmentShuffler;
 import com.dankotyt.core.service.encryption.SegmentSizeStrategy;
+import com.dankotyt.core.service.encryption.drbg.SHA3DRBG;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -75,18 +76,18 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
      *         размер сегмента и карту соответствия
      */
     @Override
-    public SegmentationResult segmentAndShuffle(BufferedImage image, SecureRandom prng) {
+    public SegmentationResult segmentAndShuffle(BufferedImage image, SHA3DRBG drbg) {
         if (image == null) {
             throw new IllegalArgumentException("Image cannot be null");
         }
-        if (prng == null) {
+        if (drbg == null) {
             throw new IllegalArgumentException("PRNG cannot be null");
         }
         int segmentSize = sizeStrategy.determineSegmentSize(image.getWidth(), image.getHeight());
         log.info("Segment size used: {}", segmentSize);
         BufferedImage paddedImage = padImageToSegmentSize(image, segmentSize);
         List<Rectangle> segments = createSegments(paddedImage, segmentSize);
-        List<Integer> indices = getShuffledIndices(segments.size(), prng);
+        List<Integer> indices = getShuffledIndices(segments.size(), drbg);
 
         BufferedImage result = new BufferedImage(paddedImage.getWidth(), paddedImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = result.createGraphics();
@@ -112,7 +113,7 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
      * @return изображение с восстановленным порядком сегментов
      */
     @Override
-    public BufferedImage unshuffle(BufferedImage shuffledImage, SecureRandom prng) {
+    public BufferedImage unshuffle(BufferedImage shuffledImage, SHA3DRBG drbg) {
         if (shuffledImage == null) {
             throw new IllegalArgumentException("Shuffled image cannot be null");
         }
@@ -122,13 +123,13 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
         if (originalWidth <= 0 || originalHeight <= 0) {
             throw new IllegalArgumentException("Original dimensions must be positive");
         }
-        if (prng == null) {
+        if (drbg == null) {
             throw new IllegalArgumentException("PRNG cannot be null");
         }
         int segmentSize = sizeStrategy.determineSegmentSize(originalWidth, originalHeight);
         log.info("Segment size used: {}", segmentSize);
         List<Rectangle> segments = createSegments(shuffledImage, segmentSize);
-        List<Integer> indices = getShuffledIndices(segments.size(), prng);
+        List<Integer> indices = getShuffledIndices(segments.size(), drbg);
 
         Map<Integer, Integer> reverse = new HashMap<>();
         for (int i = 0; i < indices.size(); i++) reverse.put(indices.get(i), i);
@@ -220,9 +221,9 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
     /**
      * Перемешивает список детерминированным образом
      */
-    private <T> void shuffleList(List<T> list, SecureRandom prng) {
+    private <T> void shuffleList(List<T> list, SHA3DRBG drbg) {
         for (int i = list.size() - 1; i > 0; i--) {
-            int j = prng.nextInt(i + 1);
+            int j = drbg.nextInt(i + 1);
             T temp = list.get(i);
             list.set(i, list.get(j));
             list.set(j, temp);
@@ -233,13 +234,13 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
      * Возвращает список индексов от 0 до size-1, случайно перемешанный с помощью {@link #shuffleList}.
      *
      * @param size количество индексов.
-     * @param prng генератор.
+     * @param drbg генератор.
      * @return перемешанный список индексов.
      */
-    private List<Integer> getShuffledIndices(int size, SecureRandom prng) {
+    private List<Integer> getShuffledIndices(int size, SHA3DRBG drbg) {
         List<Integer> indices = new ArrayList<>();
         for (int i = 0; i < size; i++) indices.add(i);
-        shuffleList(indices, prng);
+        shuffleList(indices, drbg);
         return indices;
     }
 }
