@@ -44,6 +44,8 @@ dependencies {
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
     testImplementation 'org.mockito:mockito-core'
     testImplementation 'org.mockito:mockito-junit-jupiter'
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.84'
+    implementation 'org.bouncycastle:bcpkix-jdk18on:1.84'
 }
 
 test {
@@ -97,7 +99,5 @@ publishing {
 }
 
 signing {
-    def signingKey = project.findProperty("signing.key") ?: System.getenv("SIGNING_KEY")
-    def signingPassword = project.findProperty("signing.password") ?: System.getenv("SIGNING_PASSWORD")
-    useInMemoryPgpKeys(signingKey, signingPassword)
+    useGpgCmd()
 }
