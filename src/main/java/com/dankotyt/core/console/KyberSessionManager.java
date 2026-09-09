@@ -2,7 +2,7 @@ package com.dankotyt.core.console;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider;
-import org.bouncycastle.pqc.jcajce.spec.KyberParameterSpec;
+import org.bouncycastle.pqc.jcajce.spec.NTRUParameterSpec;
 
 import javax.crypto.KEM;
 import javax.crypto.SecretKey;
@@ -23,9 +23,13 @@ public class KyberSessionManager {
         Security.addProvider(new BouncyCastlePQCProvider());
     }
 
+    /**
+     * Генерирует ключевую пару NTRU с параметрами NTRU-HPS-2048-677.
+     */
     public void generateLocalKeys() throws Exception {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("MLKEM", "BCPQC");
-        kpg.initialize(KyberParameterSpec.kyber1024);
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("NTRU", "BCPQC");
+        // Явно указываем набор параметров
+        kpg.initialize(NTRUParameterSpec.ntruhps2048677, new SecureRandom());
         KeyPair keyPair = kpg.generateKeyPair();
         this.privateKey = keyPair.getPrivate();
         this.publicKeyBytes = keyPair.getPublic().getEncoded();
@@ -58,23 +62,23 @@ public class KyberSessionManager {
         DataInputStream dis = new DataInputStream(socket.getInputStream());
         DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
 
-        // 1. Получить публичный ключ клиента
+        // 1) Получаем публичный ключ клиента
         int clientKeyLen = dis.readInt();
         byte[] clientPublicKeyBytes = new byte[clientKeyLen];
         dis.readFully(clientPublicKeyBytes);
 
-        // 2. Отправить свой публичный ключ
+        // 2) Отправляем свой публичный ключ
         dos.writeInt(publicKeyBytes.length);
         dos.write(publicKeyBytes);
         dos.flush();
 
-        // 3. Получить encapsulation от клиента
+        // 3) Получаем encapsulation от клиента
         int encLen = dis.readInt();
         byte[] encapsulatedSecret = new byte[encLen];
         dis.readFully(encapsulatedSecret);
 
-        // 4. Decapsulation (получаем SecretKey)
-        KEM kem = KEM.getInstance("MLKEM", "BCPQC");
+        // 4) Decapsulation через KEM (алгоритм "NTRU")
+        KEM kem = KEM.getInstance("NTRU", "BCPQC");
         KEM.Decapsulator decapsulator = kem.newDecapsulator(privateKey);
         SecretKey secretKey = decapsulator.decapsulate(encapsulatedSecret);
         sharedSecret = secretKey.getEncoded();
@@ -86,31 +90,30 @@ public class KyberSessionManager {
         DataInputStream dis = new DataInputStream(socket.getInputStream());
         DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
 
-        // 1. Отправить свой публичный ключ
+        // 1) Отправляем свой публичный ключ
         dos.writeInt(publicKeyBytes.length);
         dos.write(publicKeyBytes);
         dos.flush();
 
-        // 2. Получить публичный ключ сервера
+        // 2) Получаем публичный ключ сервера
         int serverKeyLen = dis.readInt();
         byte[] serverPublicKeyBytes = new byte[serverKeyLen];
         dis.readFully(serverPublicKeyBytes);
 
-        // 3. Восстановить публичный ключ сервера
-        KeyFactory kf = KeyFactory.getInstance("MLKEM", "BCPQC");
+        // 3) Восстанавливаем публичный ключ (KeyFactory использует "NTRU")
+        KeyFactory kf = KeyFactory.getInstance("NTRU", "BCPQC");
         PublicKey serverPublicKey = kf.generatePublic(new X509EncodedKeySpec(serverPublicKeyBytes));
 
-        // 4. Encapsulation (получаем Encapsulated)
-        KEM kem = KEM.getInstance("MLKEM", "BCPQC");
+        // 4) Encapsulation через KEM (алгоритм "NTRU")
+        KEM kem = KEM.getInstance("NTRU", "BCPQC");
         KEM.Encapsulator encapsulator = kem.newEncapsulator(serverPublicKey);
         KEM.Encapsulated encapsulated = encapsulator.encapsulate();
 
-        // Извлекаем общий секрет и зашифрованный секрет
-        SecretKey secretKey = encapsulated.key();
-        sharedSecret = secretKey.getEncoded();
+        SecretKey sharedSecretKey = encapsulated.key();
+        sharedSecret = sharedSecretKey.getEncoded();
         byte[] encSecret = encapsulated.encapsulation();
 
-        // 5. Отправить encapsulation серверу
+        // 5) Отправляем encapsulation серверу
         dos.writeInt(encSecret.length);
         dos.write(encSecret);
         dos.flush();

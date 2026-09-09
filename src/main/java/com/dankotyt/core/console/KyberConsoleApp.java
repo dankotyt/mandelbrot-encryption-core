@@ -3,16 +3,21 @@ package com.dankotyt.core.console;
 import com.dankotyt.core.dto.EncryptedData;
 import com.dankotyt.core.service.encryption.ImageDecryptor;
 import com.dankotyt.core.service.encryption.ImageEncryptor;
+import com.dankotyt.core.service.encryption.SegmentShuffler;
+import com.dankotyt.core.utils.ImageUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.security.Provider;
+import java.security.Security;
 import java.util.Scanner;
 
 @Configuration
@@ -24,12 +29,19 @@ public class KyberConsoleApp {
 
     private final ImageEncryptor encryptor;
     private final ImageDecryptor decryptor;
-    private final Scanner scanner = new Scanner(System.in);
+    private final Scanner scanner;
     private byte[] currentSecret;
 
-    public KyberConsoleApp(ImageEncryptor encryptor, ImageDecryptor decryptor) {
+    private final ImageUtils imageUtils;
+    private final SegmentShuffler segmentShuffler;
+
+    public KyberConsoleApp(ImageEncryptor encryptor, ImageDecryptor decryptor,
+                           ImageUtils imageUtils, SegmentShuffler segmentShuffler) {
         this.encryptor = encryptor;
         this.decryptor = decryptor;
+        this.imageUtils = imageUtils;
+        this.segmentShuffler = segmentShuffler;
+        this.scanner = new Scanner(System.in, StandardCharsets.UTF_8);
     }
 
     public static void main(String[] args) throws Exception {
@@ -41,6 +53,13 @@ public class KyberConsoleApp {
 
     public void run() throws Exception {
         System.out.println("=== Постквантовое шифрование изображений (Kyber) ===");
+        Provider provider = Security.getProvider("BCPQC");
+        System.out.println("Provider: " + provider.getName());
+        for (Provider.Service service : provider.getServices()) {
+            if (service.getType().equals("KeyPairGenerator") || service.getType().equals("KEM")) {
+                System.out.println(service.getType() + ": " + service.getAlgorithm());
+            }
+        }
 
         // Попытка загрузить сохранённый секрет
         if (Files.exists(Paths.get(SECRET_FILE))) {
@@ -164,64 +183,73 @@ public class KyberConsoleApp {
             return;
         }
 
-        // Подготовка шифратора
         encryptor.prepareSession(currentSecret);
-
-        // Загрузка изображения
         BufferedImage image = ImageIO.read(new File(imagePath));
         if (image == null) {
             System.out.println("Не удалось прочитать изображение.");
             return;
         }
 
-        // Шифрование
         EncryptedData encryptedData = encryptor.encryptWhole(image);
 
-        // Создание папки "cipher_<имя>"
         Path originalPath = Paths.get(imagePath);
         String baseName = originalPath.getFileName().toString();
         int dotIndex = baseName.lastIndexOf('.');
         String nameWithoutExt = (dotIndex > 0) ? baseName.substring(0, dotIndex) : baseName;
-        Path outputDir = originalPath.getParent().resolve("cipher_" + nameWithoutExt);
+
+        Path parentDir = originalPath.getParent();
+        if (parentDir == null) parentDir = Paths.get(".");
+        Path outputDir = parentDir.resolve("cipher_" + nameWithoutExt);
         Files.createDirectories(outputDir);
 
-        // Сохранение метаданных и зашифрованных байт в один файл
+        // 1. Сохраняем оригинал
+        Path originalImagePath = outputDir.resolve("original.png");
+        ImageIO.write(image, "PNG", originalImagePath.toFile());
+
+        // 2. Сохраняем зашифрованное изображение (как PNG)
+        int fullWidth = encryptedData.originalWidth();
+        int fullHeight = encryptedData.originalHeight();
+        Dimension paddedFull = segmentShuffler.getPaddedDimensions(fullWidth, fullHeight);
+        BufferedImage encryptedImage = imageUtils.bytesToImage(encryptedData.imageBytes(), paddedFull.width, paddedFull.height);
+        Path encryptedImagePath = outputDir.resolve("encrypted.png");
+        ImageIO.write(encryptedImage, "PNG", encryptedImagePath.toFile());
+
+        // 3. Сохраняем бинарный файл для расшифровки
         Path encryptedFile = outputDir.resolve("encrypted_data.bin");
         try (ObjectOutputStream oos = new ObjectOutputStream(Files.newOutputStream(encryptedFile))) {
             oos.writeObject(encryptedData);
         }
 
-        System.out.println("Изображение зашифровано. Результат сохранён в: " + encryptedFile.toAbsolutePath());
-        System.out.println("Для расшифровки передайте этот файл получателю и используйте тот же секрет.");
+        System.out.println("✅ Изображение зашифровано.");
+        System.out.println("  Оригинал сохранён в: " + originalImagePath.toAbsolutePath());
+        System.out.println("  Зашифрованное изображение: " + encryptedImagePath.toAbsolutePath());
+        System.out.println("  Бинарный файл для расшифровки: " + encryptedFile.toAbsolutePath());
+        System.out.println("Для расшифровки передайте бинарный файл и используйте тот же секрет.");
     }
 
     private void decryptImage() throws Exception {
-        System.out.print("Введите абсолютный путь к файлу с зашифрованными данными (encrypted_data.bin): ");
+        System.out.print("Введите абсолютный путь к файлу с зашифрованными данними (encrypted_data.bin): ");
         String filePath = scanner.nextLine().trim();
         if (!Files.exists(Paths.get(filePath))) {
             System.out.println("Файл не найден.");
             return;
         }
 
-        // Десериализация EncryptedData
         EncryptedData encryptedData;
         try (ObjectInputStream ois = new ObjectInputStream(Files.newInputStream(Paths.get(filePath)))) {
             encryptedData = (EncryptedData) ois.readObject();
         }
 
-        // Подготовка дешифратора
         decryptor.prepareSession(currentSecret);
-
-        // Расшифровка (используем новый метод, который не требует InetAddress)
         BufferedImage decryptedImage = decryptor.decryptImage(encryptedData);
 
-        // Сохранение результата рядом с зашифрованным файлом
         Path encryptedPath = Paths.get(filePath);
         Path outputDir = encryptedPath.getParent();
-        Path resultImage = outputDir.resolve("decrypted_" + encryptedPath.getFileName().toString().replace(".bin", ".png"));
+        if (outputDir == null) outputDir = Paths.get(".");
+        Path resultImage = outputDir.resolve("decrypted.png");
         ImageIO.write(decryptedImage, "PNG", resultImage.toFile());
 
-        System.out.println("Изображение расшифровано. Результат: " + resultImage.toAbsolutePath());
+        System.out.println("✅ Изображение расшифровано. Результат: " + resultImage.toAbsolutePath());
     }
 
     private void saveSecretToFile() throws IOException {

@@ -9,6 +9,7 @@ temp
 config.xml
 .env
 releases
+session.secret
 
 ###Gradle###
 .gradle
