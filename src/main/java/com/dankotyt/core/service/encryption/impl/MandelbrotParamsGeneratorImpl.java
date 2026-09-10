@@ -2,7 +2,7 @@ package com.dankotyt.core.service.encryption.impl;
 
 import com.dankotyt.core.dto.MandelbrotParams;
 import com.dankotyt.core.service.encryption.MandelbrotParamsGenerator;
-import com.dankotyt.core.service.encryption.drbg.SHA3DRBG;
+import com.dankotyt.core.service.encryption.drbg.ShakeDRBG;
 
 import java.security.SecureRandom;
 
@@ -113,7 +113,7 @@ public class MandelbrotParamsGeneratorImpl implements MandelbrotParamsGenerator 
     }
 
     @Override
-    public MandelbrotParams generate(SHA3DRBG drbg) {
+    public MandelbrotParams generate(ShakeDRBG drbg) {
         if (drbg == null) throw new IllegalArgumentException("DRBG cannot be null");
         double zoom = zoomMin + drbg.nextDouble() * (zoomMax - zoomMin);
         double offsetX = offsetXMin + drbg.nextDouble() * (offsetXMax - offsetXMin);

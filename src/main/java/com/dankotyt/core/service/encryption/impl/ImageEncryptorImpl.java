@@ -3,7 +3,7 @@ package com.dankotyt.core.service.encryption.impl;
 import com.dankotyt.core.dto.EncryptedData;
 import com.dankotyt.core.dto.MandelbrotParams;
 import com.dankotyt.core.service.encryption.*;
-import com.dankotyt.core.service.encryption.drbg.SHA3DRBG;
+import com.dankotyt.core.service.encryption.drbg.ShakeDRBG;
 import com.dankotyt.core.service.encryption.sbox.DynamicSBoxGenerator;
 import com.dankotyt.core.service.encryption.util.HKDF;
 import com.dankotyt.core.utils.ImageUtils;
@@ -31,8 +31,8 @@ public class ImageEncryptorImpl implements ImageEncryptor {
     private final SBoxUtil sBoxUtil;
 
     private byte[] sessionSalt;
-    private SHA3DRBG paramsDrbg;
-    private SHA3DRBG segDrbg;
+    private ShakeDRBG paramsDrbg;
+    private ShakeDRBG segDrbg;
     private byte[] sharedSecret;
     private int attemptCount;
     private BufferedImage fractalImage;
@@ -60,8 +60,8 @@ public class ImageEncryptorImpl implements ImageEncryptor {
         byte[] keyFractalParams = HKDF.expand(prk, "fractal-params".getBytes(StandardCharsets.UTF_8), 32);
         byte[] keySegmentation = HKDF.expand(prk, "segmentation".getBytes(StandardCharsets.UTF_8), 32);
 
-        this.paramsDrbg = new SHA3DRBG(keyFractalParams);
-        this.segDrbg = new SHA3DRBG(keySegmentation);
+        this.paramsDrbg = new ShakeDRBG(keyFractalParams);
+        this.segDrbg = new ShakeDRBG(keySegmentation);
 
         this.attemptCount = 0;
         this.fractalImage = null;

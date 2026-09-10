@@ -1,6 +1,6 @@
 package com.dankotyt.core.service.encryption.sbox;
 
-import com.dankotyt.core.service.encryption.drbg.SHA3DRBG;
+import com.dankotyt.core.service.encryption.drbg.ShakeDRBG;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -18,7 +18,7 @@ public class DynamicSBoxGenerator {
         byte[] fractalHash = hashIterationArray(iterationArray);
         byte[] combined = concat(seed, fractalHash);
         combined = concat(combined, "DynamicSBox".getBytes());
-        SHA3DRBG drbg = new SHA3DRBG(combined);
+        ShakeDRBG drbg = new ShakeDRBG(combined);
 
         List<Integer> list = new ArrayList<>();
         for (int i = 0; i < 256; i++) list.add(i);

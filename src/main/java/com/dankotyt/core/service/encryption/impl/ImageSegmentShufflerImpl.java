@@ -3,14 +3,13 @@ package com.dankotyt.core.service.encryption.impl;
 import com.dankotyt.core.dto.SegmentationResult;
 import com.dankotyt.core.service.encryption.SegmentShuffler;
 import com.dankotyt.core.service.encryption.SegmentSizeStrategy;
-import com.dankotyt.core.service.encryption.drbg.SHA3DRBG;
+import com.dankotyt.core.service.encryption.drbg.ShakeDRBG;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -76,7 +75,7 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
      *         размер сегмента и карту соответствия
      */
     @Override
-    public SegmentationResult segmentAndShuffle(BufferedImage image, SHA3DRBG drbg) {
+    public SegmentationResult segmentAndShuffle(BufferedImage image, ShakeDRBG drbg) {
         if (image == null) {
             throw new IllegalArgumentException("Image cannot be null");
         }
@@ -113,7 +112,7 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
      * @return изображение с восстановленным порядком сегментов
      */
     @Override
-    public BufferedImage unshuffle(BufferedImage shuffledImage, SHA3DRBG drbg) {
+    public BufferedImage unshuffle(BufferedImage shuffledImage, ShakeDRBG drbg) {
         if (shuffledImage == null) {
             throw new IllegalArgumentException("Shuffled image cannot be null");
         }
@@ -221,7 +220,7 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
     /**
      * Перемешивает список детерминированным образом
      */
-    private <T> void shuffleList(List<T> list, SHA3DRBG drbg) {
+    private <T> void shuffleList(List<T> list, ShakeDRBG drbg) {
         for (int i = list.size() - 1; i > 0; i--) {
             int j = drbg.nextInt(i + 1);
             T temp = list.get(i);
@@ -237,7 +236,7 @@ public class ImageSegmentShufflerImpl implements SegmentShuffler {
      * @param drbg генератор.
      * @return перемешанный список индексов.
      */
-    private List<Integer> getShuffledIndices(int size, SHA3DRBG drbg) {
+    private List<Integer> getShuffledIndices(int size, ShakeDRBG drbg) {
         List<Integer> indices = new ArrayList<>();
         for (int i = 0; i < size; i++) indices.add(i);
         shuffleList(indices, drbg);

@@ -5,7 +5,7 @@ import com.dankotyt.core.dto.MandelbrotParams;
 import com.dankotyt.core.service.encryption.ImageDecryptor;
 import com.dankotyt.core.service.encryption.MandelbrotService;
 import com.dankotyt.core.service.encryption.SegmentShuffler;
-import com.dankotyt.core.service.encryption.drbg.SHA3DRBG;
+import com.dankotyt.core.service.encryption.drbg.ShakeDRBG;
 import com.dankotyt.core.service.encryption.sbox.DynamicSBoxGenerator;
 import com.dankotyt.core.service.encryption.util.HKDF;
 import com.dankotyt.core.service.network.CryptoKeyManager;
@@ -29,8 +29,8 @@ public class ImageDecryptorImpl implements ImageDecryptor {
     private final SBoxUtil sBoxUtil;
     private final CryptoKeyManager cryptoKeyManager;
     private byte[] sessionSharedSecret;
-    private SHA3DRBG paramsDrbg;
-    private SHA3DRBG segDrbg;
+    private ShakeDRBG paramsDrbg;
+    private ShakeDRBG segDrbg;
 
     /**
      * Создаёт экземпляр дешифратора с необходимыми зависимостями.
@@ -107,8 +107,8 @@ public class ImageDecryptorImpl implements ImageDecryptor {
         byte[] keyFractalParams = HKDF.expand(prk, "fractal-params".getBytes(StandardCharsets.UTF_8), 32);
         byte[] keySegmentation = HKDF.expand(prk, "segmentation".getBytes(StandardCharsets.UTF_8), 32);
 
-        SHA3DRBG paramsDrbg = new SHA3DRBG(keyFractalParams);
-        SHA3DRBG segDrbg = new SHA3DRBG(keySegmentation);
+        ShakeDRBG paramsDrbg = new ShakeDRBG(keyFractalParams);
+        ShakeDRBG segDrbg = new ShakeDRBG(keySegmentation);
 
         MandelbrotParams params = null;
         for (int i = 0; i < attempts; i++) {
@@ -166,8 +166,8 @@ public class ImageDecryptorImpl implements ImageDecryptor {
         byte[] keyFractalParams = HKDF.expand(prk, "fractal-params".getBytes(StandardCharsets.UTF_8), 32);
         byte[] keySegmentation = HKDF.expand(prk, "segmentation".getBytes(StandardCharsets.UTF_8), 32);
 
-        this.paramsDrbg = new SHA3DRBG(keyFractalParams);
-        this.segDrbg = new SHA3DRBG(keySegmentation);
+        this.paramsDrbg = new ShakeDRBG(keyFractalParams);
+        this.segDrbg = new ShakeDRBG(keySegmentation);
 
         // Генерируем параметры фрактала (один раз)
         MandelbrotParams params = mandelbrotService.generateParams(paramsDrbg);
