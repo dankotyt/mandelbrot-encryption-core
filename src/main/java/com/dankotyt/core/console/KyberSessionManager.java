@@ -1,22 +1,34 @@
 package com.dankotyt.core.console;
 
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
+import org.bouncycastle.crypto.SecretWithEncapsulation;
+import org.bouncycastle.crypto.generators.MLKEMKeyPairGenerator;
+import org.bouncycastle.crypto.kems.MLKEMExtractor;
+import org.bouncycastle.crypto.kems.MLKEMGenerator;
+import org.bouncycastle.crypto.params.MLKEMKeyGenerationParameters;
+import org.bouncycastle.crypto.params.MLKEMParameters;
+import org.bouncycastle.crypto.params.MLKEMPrivateKeyParameters;
+import org.bouncycastle.crypto.params.MLKEMPublicKeyParameters;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider;
-import org.bouncycastle.pqc.jcajce.spec.NTRUParameterSpec;
 
-import javax.crypto.KEM;
-import javax.crypto.SecretKey;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.security.*;
-import java.security.spec.X509EncodedKeySpec;
+import java.security.SecureRandom;
+import java.security.Security;
 
+/**
+ * Управляет сессией с использованием ML-KEM (Kyber) для обмена общим секретом.
+ * Заменяет предыдущую реализацию на NTRU.
+ */
 public class KyberSessionManager {
 
     private byte[] sharedSecret;
-    private PrivateKey privateKey;
+    private MLKEMPrivateKeyParameters privateKey;
+    private MLKEMPublicKeyParameters publicKey;
     private byte[] publicKeyBytes;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     static {
         Security.addProvider(new BouncyCastleProvider());
@@ -24,15 +36,17 @@ public class KyberSessionManager {
     }
 
     /**
-     * Генерирует ключевую пару NTRU с параметрами NTRU-HPS-2048-677.
+     * Генерирует ключевую пару ML-KEM с параметрами ML-KEM-1024.
      */
     public void generateLocalKeys() throws Exception {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("NTRU", "BCPQC");
-        // Явно указываем набор параметров
-        kpg.initialize(NTRUParameterSpec.ntruhps2048677, new SecureRandom());
-        KeyPair keyPair = kpg.generateKeyPair();
-        this.privateKey = keyPair.getPrivate();
-        this.publicKeyBytes = keyPair.getPublic().getEncoded();
+        MLKEMKeyPairGenerator keyPairGenerator = new MLKEMKeyPairGenerator();
+        keyPairGenerator.init(new MLKEMKeyGenerationParameters(
+                secureRandom, MLKEMParameters.ml_kem_1024));
+
+        AsymmetricCipherKeyPair keyPair = keyPairGenerator.generateKeyPair();
+        this.privateKey = (MLKEMPrivateKeyParameters) keyPair.getPrivate();
+        this.publicKey = (MLKEMPublicKeyParameters) keyPair.getPublic();
+        this.publicKeyBytes = publicKey.getEncoded();
     }
 
     public byte[] getPublicKeyBytes() {
@@ -77,11 +91,9 @@ public class KyberSessionManager {
         byte[] encapsulatedSecret = new byte[encLen];
         dis.readFully(encapsulatedSecret);
 
-        // 4) Decapsulation через KEM (алгоритм "NTRU")
-        KEM kem = KEM.getInstance("NTRU", "BCPQC");
-        KEM.Decapsulator decapsulator = kem.newDecapsulator(privateKey);
-        SecretKey secretKey = decapsulator.decapsulate(encapsulatedSecret);
-        sharedSecret = secretKey.getEncoded();
+        // 4) Декапсуляция через MLKEMExtractor
+        MLKEMExtractor extractor = new MLKEMExtractor(privateKey);
+        sharedSecret = extractor.extractSecret(encapsulatedSecret);
 
         System.out.println("Общий секрет получен (длина: " + sharedSecret.length + " байт)");
     }
@@ -100,18 +112,18 @@ public class KyberSessionManager {
         byte[] serverPublicKeyBytes = new byte[serverKeyLen];
         dis.readFully(serverPublicKeyBytes);
 
-        // 3) Восстанавливаем публичный ключ (KeyFactory использует "NTRU")
-        KeyFactory kf = KeyFactory.getInstance("NTRU", "BCPQC");
-        PublicKey serverPublicKey = kf.generatePublic(new X509EncodedKeySpec(serverPublicKeyBytes));
+        // 3) Восстанавливаем публичный ключ сервера
+        // Для этого нужно знать параметры. Предполагаем ML-KEM-1024.
+        // В реальной системе параметры должны быть согласованы.
+        MLKEMPublicKeyParameters serverPublicKey = new MLKEMPublicKeyParameters(
+                MLKEMParameters.ml_kem_1024, serverPublicKeyBytes);
 
-        // 4) Encapsulation через KEM (алгоритм "NTRU")
-        KEM kem = KEM.getInstance("NTRU", "BCPQC");
-        KEM.Encapsulator encapsulator = kem.newEncapsulator(serverPublicKey);
-        KEM.Encapsulated encapsulated = encapsulator.encapsulate();
+        // 4) Инкапсуляция через MLKEMGenerator
+        MLKEMGenerator generator = new MLKEMGenerator(secureRandom);
+        SecretWithEncapsulation encapsulated = generator.generateEncapsulated(serverPublicKey);
 
-        SecretKey sharedSecretKey = encapsulated.key();
-        sharedSecret = sharedSecretKey.getEncoded();
-        byte[] encSecret = encapsulated.encapsulation();
+        sharedSecret = encapsulated.getSecret();
+        byte[] encSecret = encapsulated.getEncapsulation();
 
         // 5) Отправляем encapsulation серверу
         dos.writeInt(encSecret.length);
