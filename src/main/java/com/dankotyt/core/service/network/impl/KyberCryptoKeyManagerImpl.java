@@ -2,86 +2,83 @@ package com.dankotyt.core.service.network.impl;
 
 import com.dankotyt.core.model.KyberKeyPair;
 import com.dankotyt.core.service.network.CryptoKeyManager;
-import org.bouncycastle.jcajce.SecretKeyWithEncapsulation;
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
+import org.bouncycastle.crypto.SecretWithEncapsulation;
+import org.bouncycastle.crypto.generators.MLKEMKeyPairGenerator;
+import org.bouncycastle.crypto.kems.MLKEMExtractor;
+import org.bouncycastle.crypto.kems.MLKEMGenerator;
+import org.bouncycastle.crypto.params.MLKEMKeyGenerationParameters;
+import org.bouncycastle.crypto.params.MLKEMParameters;
+import org.bouncycastle.crypto.params.MLKEMPrivateKeyParameters;
+import org.bouncycastle.crypto.params.MLKEMPublicKeyParameters;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider;
-import org.bouncycastle.pqc.jcajce.spec.KyberParameterSpec;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.KEM;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.security.*;
-import java.security.spec.X509EncodedKeySpec;
+import java.security.SecureRandom;
+import java.security.Security;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Реализация {@link CryptoKeyManager} на основе постквантового алгоритма Kyber (ML-KEM).
+ * Реализация {@link CryptoKeyManager} на основе постквантового алгоритма ML-KEM (Kyber).
  * <p>
- * Kyber является KEM (Key Encapsulation Mechanism):
- * - Отправитель генерирует пару ключей, публичный ключ передаёт получателю.
- * - Получатель использует публичный ключ для генерации общего секрета ( encapsulation)
- *   и отправляет его обратно отправителю.
- * - Отправитель расшифровывает (decapsulation) полученный секрет своим приватным ключом.
- * <p>
- * В данной реализации используется упрощённая модель: каждый пир хранит свою пару ключей,
- * а общий секрет вычисляется при регистрации пира.
+ * Использует низкоуровневый API Bouncy Castle ({@code org.bouncycastle.crypto.kems})
+ * для выполнения операций инкапсуляции и декапсуляции ключей.
  */
 @Service
 public class KyberCryptoKeyManagerImpl implements CryptoKeyManager {
 
-    @Override
-    public void addPeer(InetAddress peerAddress, KyberKeyPair peerKeyPair) {
-
-    }
-
     static {
-        // Регистрация провайдеров Bouncy Castle
+        // Регистрация провайдеров Bouncy Castle (все еще нужна для некоторых утилит)
         Security.addProvider(new BouncyCastleProvider());
         Security.addProvider(new BouncyCastlePQCProvider());
     }
 
     private volatile KyberKeyPair currentKeys;
-    private final Map<String, KyberKeyPair> peers = new ConcurrentHashMap<>();
+    private final Map<String, byte[]> peerSharedSecrets = new ConcurrentHashMap<>();
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public KyberCryptoKeyManagerImpl() {
         generateNewKeys();
     }
 
     /**
-     * Генерирует новую пару ключей Kyber (уровень Kyber1024).
+     * Генерирует новую пару ключей ML-KEM (уровень безопасности ML-KEM-1024).
+     * Использует низкоуровневый генератор ключей Bouncy Castle.
      */
     @Override
     public void generateNewKeys() {
         try {
-            KeyPairGenerator kpg = KeyPairGenerator.getInstance("Kyber", "BCPQC");
-            kpg.initialize(KyberParameterSpec.kyber1024);
-            KeyPair keyPair = kpg.generateKeyPair();
+            MLKEMKeyPairGenerator keyPairGenerator = new MLKEMKeyPairGenerator();
+            keyPairGenerator.init(new MLKEMKeyGenerationParameters(
+                    secureRandom, MLKEMParameters.ml_kem_1024));
+
+            AsymmetricCipherKeyPair keyPair = keyPairGenerator.generateKeyPair();
 
             this.currentKeys = new KyberKeyPair(
-                    keyPair.getPrivate(),
-                    keyPair.getPublic(),
+                    (MLKEMPrivateKeyParameters) keyPair.getPrivate(),
+                    (MLKEMPublicKeyParameters) keyPair.getPublic(),
                     Instant.now()
             );
         } catch (Exception e) {
-            throw new RuntimeException("Ошибка генерации ключей Kyber", e);
+            throw new RuntimeException("Ошибка генерации ключей ML-KEM", e);
         }
     }
 
     /**
-     * Возвращает общий секрет (байты) для зарегистрированного пира.
-     * В модели Kyber общий секрет вычисляется при регистрации пира
-     * и сохраняется в объекте KyberKeyPair.
+     * Возвращает общий секрет (master seed) для зарегистрированного пира.
      */
     @Override
     public byte[] getMasterSeedFromDH(InetAddress peerAddress) {
-        KyberKeyPair peerKeys = peers.get(peerAddress.getHostAddress());
-        if (peerKeys == null || peerKeys.getSharedSecret() == null) {
+        byte[] secret = peerSharedSecrets.get(peerAddress.getHostAddress());
+        if (secret == null) {
             throw new IllegalStateException("Нет общего секрета для пира: " + peerAddress);
         }
-        return peerKeys.getSharedSecret();
+        return secret.clone();
     }
 
     /**
@@ -93,63 +90,34 @@ public class KyberCryptoKeyManagerImpl implements CryptoKeyManager {
     }
 
     /**
-     * Регистрирует пира и вычисляет общий секрет.
-     * <p>
-     * В этой упрощённой модели мы предполагаем, что пир уже имеет наш публичный ключ
-     * и прислал свой зашифрованный общий секрет (encapsulated secret).
+     * Регистрирует пира и вычисляет общий секрет, используя {@link MLKEMExtractor}.
      *
-     * @param peerAddress адрес пира
+     * @param peerAddress        адрес пира
      * @param encapsulatedSecret зашифрованный общий секрет от пира
      */
     public void addPeer(InetAddress peerAddress, byte[] encapsulatedSecret) {
         if (peerAddress == null || encapsulatedSecret == null) {
             throw new IllegalArgumentException("Адрес пира или encapsulatedSecret не могут быть null");
         }
-
         try {
-            // Используем KEM API для расшифровки (decapsulation)
-            KEM kem = KEM.getInstance("Kyber", "BCPQC");
-            KEM.Decapsulator decapsulator = kem.newDecapsulator(currentKeys.getPrivateKey());
-
-            // Расшифровываем общий секрет
-            SecretKeyWithEncapsulation secretKey = (SecretKeyWithEncapsulation)
-                    decapsulator.decapsulate(encapsulatedSecret);
-
-            byte[] sharedSecret = secretKey.getEncoded();
-
-            // Создаём копию ключей для пира и сохраняем общий секрет
-            KyberKeyPair peerKeys = new KyberKeyPair(
-                    currentKeys.getPrivateKey(),
-                    currentKeys.getPublicKey(),
-                    currentKeys.getCreationTime()
-            );
-            peerKeys.setSharedSecret(sharedSecret);
-
-            peers.put(peerAddress.getHostAddress(), peerKeys);
-
+            MLKEMExtractor extractor = new MLKEMExtractor(currentKeys.getPrivateKey());
+            byte[] sharedSecret = extractor.extractSecret(encapsulatedSecret);
+            peerSharedSecrets.put(peerAddress.getHostAddress(), sharedSecret);
         } catch (Exception e) {
-            throw new RuntimeException("Ошибка при расшифровке общего секрета Kyber", e);
+            throw new RuntimeException("Ошибка при декапсуляции общего секрета ML-KEM", e);
         }
     }
 
     /**
      * Генерирует зашифрованный общий секрет (encapsulation) для публичного ключа пира.
-     * Возвращает Encapsulated, который содержит зашифрованный секрет и сам секрет (может быть использован сразу).
+     * Использует {@link MLKEMGenerator} из низкоуровневого API.
      */
-    public KEM.Encapsulated generateEncapsulated(byte[] peerPublicKeyBytes) {
+    public SecretWithEncapsulation generateEncapsulated(MLKEMPublicKeyParameters peerPublicKey) {
         try {
-            // Восстанавливаем публичный ключ пира
-            KeyFactory kf = KeyFactory.getInstance("Kyber", "BCPQC");
-            PublicKey peerPublicKey = kf.generatePublic(new X509EncodedKeySpec(peerPublicKeyBytes));
-
-            KEM kem = KEM.getInstance("Kyber", "BCPQC");
-            KEM.Encapsulator encapsulator = kem.newEncapsulator(peerPublicKey);
-            // Выполняем encapsulation – получаем зашифрованный секрет и общий секрет
-
-            return encapsulator.encapsulate();
-
+            MLKEMGenerator generator = new MLKEMGenerator(secureRandom);
+            return generator.generateEncapsulated(peerPublicKey);
         } catch (Exception e) {
-            throw new RuntimeException("Ошибка при генерации зашифрованного секрета Kyber", e);
+            throw new RuntimeException("Ошибка при инкапсуляции секрета ML-KEM", e);
         }
     }
 
@@ -161,9 +129,9 @@ public class KyberCryptoKeyManagerImpl implements CryptoKeyManager {
         if (peerAddress == null) {
             throw new IllegalArgumentException("Адрес пира не может быть null");
         }
-        KyberKeyPair removed = peers.remove(peerAddress.getHostAddress());
+        byte[] removed = peerSharedSecrets.remove(peerAddress.getHostAddress());
         if (removed != null) {
-            removed.invalidate();
+            java.util.Arrays.fill(removed, (byte) 0);
         }
     }
 
@@ -175,39 +143,23 @@ public class KyberCryptoKeyManagerImpl implements CryptoKeyManager {
         if (peerAddress == null) {
             throw new IllegalArgumentException("Адрес пира не может быть null");
         }
-        KyberKeyPair peerKeys = peers.get(peerAddress.getHostAddress());
-        return peerKeys != null && peerKeys.getSharedSecret() != null;
+        byte[] secret = peerSharedSecrets.get(peerAddress.getHostAddress());
+        return secret != null && secret.length > 0;
     }
 
     /**
      * Возвращает копию Map всех активных пиров.
      */
     @Override
-    public Map<InetAddress, KyberKeyPair> getActivePeersKyber() {
-        Map<InetAddress, KyberKeyPair> result = new ConcurrentHashMap<>();
-        for (Map.Entry<String, KyberKeyPair> entry : peers.entrySet()) {
+    public Map<InetAddress, byte[]> getActivePeersSharedSecrets() {
+        Map<InetAddress, byte[]> result = new ConcurrentHashMap<>();
+        for (Map.Entry<String, byte[]> entry : peerSharedSecrets.entrySet()) {
             try {
-                result.put(
-                        InetAddress.getByName(entry.getKey()),
-                        entry.getValue()
-                );
+                result.put(InetAddress.getByName(entry.getKey()), entry.getValue().clone());
             } catch (UnknownHostException e) {
-                // Игнорируем
+                // ignore
             }
         }
         return result;
-    }
-
-    /**
-     * Вспомогательный метод для восстановления публичного ключа из байтов.
-     */
-    private java.security.PublicKey restorePublicKey(byte[] keyBytes) {
-        try {
-            java.security.KeyFactory kf = java.security.KeyFactory.getInstance("Kyber", "BCPQC");
-            java.security.spec.X509EncodedKeySpec spec = new java.security.spec.X509EncodedKeySpec(keyBytes);
-            return kf.generatePublic(spec);
-        } catch (Exception e) {
-            throw new RuntimeException("Ошибка восстановления публичного ключа Kyber", e);
-        }
     }
 }

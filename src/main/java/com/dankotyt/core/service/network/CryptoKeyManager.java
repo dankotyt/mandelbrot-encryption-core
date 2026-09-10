@@ -30,7 +30,7 @@ public interface CryptoKeyManager {
 
     KyberKeyPair getCurrentKyberKeys();
 
-    void addPeer(InetAddress peerAddress, KyberKeyPair peerKeyPair);
+    void addPeer(InetAddress peerAddress, byte[] encapsulatedSecret);
 
     /**
      * Удаляет пира и безопасно стирает его общий секрет.
@@ -49,5 +49,5 @@ public interface CryptoKeyManager {
      */
     boolean hasPeer(InetAddress peerAddress);
 
-    Map<InetAddress, KyberKeyPair> getActivePeersKyber();
+    Map<InetAddress, byte[]> getActivePeersSharedSecrets();
 }
