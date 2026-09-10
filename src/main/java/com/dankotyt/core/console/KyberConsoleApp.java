@@ -16,8 +16,6 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.security.Provider;
-import java.security.Security;
 import java.util.Scanner;
 
 @Configuration
@@ -53,13 +51,6 @@ public class KyberConsoleApp {
 
     public void run() throws Exception {
         System.out.println("=== Постквантовое шифрование изображений (Kyber) ===");
-        Provider provider = Security.getProvider("BCPQC");
-        System.out.println("Provider: " + provider.getName());
-        for (Provider.Service service : provider.getServices()) {
-            if (service.getType().equals("KeyPairGenerator") || service.getType().equals("KEM")) {
-                System.out.println(service.getType() + ": " + service.getAlgorithm());
-            }
-        }
 
         // Попытка загрузить сохранённый секрет
         if (Files.exists(Paths.get(SECRET_FILE))) {
